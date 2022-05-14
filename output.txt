@@ -1,0 +1,7 @@
+
+ === Uncaught Python exception: ===
+NameError: name 'VM' is not defined
+Traceback (most recent call last):
+  File "/home/viczking/core101/core101/main_fuzz.py", line 30, in TestLexer
+    vm_ = VM(compiler_.global_code)
+
