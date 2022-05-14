@@ -6,15 +6,17 @@ from position import Position
 from constants import *
 
 class Lexer:
-    def __init__(self, fn_, text_=''):
+    def __init__(self, fn_='<stdin>', text_=''):
         self.fn = fn_
         self.text = text_
         self.pos = Position(-1, 0, -1, self.fn, self.text)
         self.current_char = None
+        self.total_lexed = -1
         self.advance()
 
 
     def advance(self):
+        self.total_lexed += 1
         self.pos.advance(self.current_char)
         self.current_char = self.text[self.pos.idx] if self.pos.idx < len(self.text) else None
     
@@ -44,7 +46,7 @@ class Lexer:
 
     def make_tokens(self):
         if len(self.text) == 0:
-            return [], EmptyStringError()
+            return [], EmptyStringError(pos_start=self.pos, pos_end=self.pos.advance())
         
         tokens = []
 
@@ -89,9 +91,9 @@ def run(fn, text):
     lexer = Lexer(fn, text)
     tokens, error = lexer.make_tokens()
     if error:
-        return None, error
+        return None, error, 0
 
     parser_ = Parser(tokens)
     ast = parser_.parse()
 
-    return ast.node, ast.error
+    return ast.node, ast.error, lexer.total_lexed

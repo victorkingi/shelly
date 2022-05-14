@@ -22,7 +22,7 @@ class BinOpNode:
 
 class UnaryOpNode:
     def __init__(self, op_tok_, node_):
-        self.op_tok = op_tok
+        self.op_tok = op_tok_
         self.node = node_
     
 

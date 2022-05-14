@@ -1,7 +1,7 @@
 # PARSER
 from error import InvalidSyntaxError
 from constants import *
-from nodes import NumberNode, BinOpNode
+from nodes import NumberNode, BinOpNode, UnaryOpNode
 
 class Parser:
     def __init__(self, tokens_):
@@ -31,7 +31,11 @@ class Parser:
         tok = self.current_tok
 
         if tok.type in (TT_PLUS, TT_MINUS):
-            res.register
+            res.register(self.advance())
+            factor = res.register(self.factor())
+            if res.error:
+                return res
+            return res.success(UnaryOpNode(tok, factor))
 
         elif tok.type in (TT_FLOAT, TT_INT):
             res.register(self.advance())
@@ -69,6 +73,7 @@ class ParseResult:
     def __init__(self):
         self.error = None
         self.node = None
+        self.total_parsed = None
     
 
     def register(self, res):
