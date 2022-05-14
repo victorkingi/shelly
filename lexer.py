@@ -1,44 +1,28 @@
 # LEXER
 from token_ import Token
+from parser import Parser
 from error import IllegalCharError, EmptyStringError
-
-# DIGITS
-
-DIGITS = '0123456789'
-
-# TOKENS
-
-TT_INT = 'INT'
-TT_FLOAT = 'FLOAT'
-TT_PLUS = 'PLUS'
-TT_MINUS = 'MINUS'
-TT_MUL = 'MUL'
-TT_DIV = 'DIV'
-TT_LPAREN = 'LPAREN'
-TT_RPAREN = 'RPAREN'
+from position import Position
+from constants import *
 
 class Lexer:
-    def __init__(self, text_=''):
+    def __init__(self, fn_, text_=''):
+        self.fn = fn_
         self.text = text_
-        self.pos = -1
+        self.pos = Position(-1, 0, -1, self.fn, self.text)
         self.current_char = None
-        self.sanitize()
         self.advance()
 
-    
-    def sanitize(self):
-        self.text = self.text.replace(" ", "")
-        self.text = self.text.replace("\t", "")
-    
 
     def advance(self):
-        self.pos += 1
-        self.current_char = self.text[self.pos] if self.pos < len(self.text) else None
+        self.pos.advance(self.current_char)
+        self.current_char = self.text[self.pos.idx] if self.pos.idx < len(self.text) else None
     
 
     def make_number(self):
         num_str = ''
         dot_count = 0
+        pos_start = self.pos.copy()
 
         while self.current_char != None and self.current_char in DIGITS + '.':
             if self.current_char == '.':
@@ -53,9 +37,9 @@ class Lexer:
             
         
         if dot_count == 0:
-            return Token(TT_INT, int(num_str))
+            return Token(TT_INT, int(num_str), pos_start, self.pos)
         else:
-            return Token(TT_FLOAT, float(num_str))
+            return Token(TT_FLOAT, float(num_str), pos_start, self.pos)
 
 
     def make_tokens(self):
@@ -66,37 +50,48 @@ class Lexer:
 
         while self.current_char != None:
             match self.current_char:
+                case val if val in '\t':
+                    self.advance()
+                case ' ':
+                    self.advance()
                 case val if val in DIGITS:
                     tokens.append(self.make_number())
                 case '+':
-                    tokens.append(Token(TT_PLUS))
+                    tokens.append(Token(TT_PLUS, pos_start_=self.pos))
                     self.advance()
                 case '-':
-                    tokens.append(Token(TT_MINUS))
+                    tokens.append(Token(TT_MINUS, pos_start_=self.pos))
                     self.advance()
                 case '*':
-                    tokens.append(Token(TT_MUL))
+                    tokens.append(Token(TT_MUL, pos_start_=self.pos))
                     self.advance()
                 case '/':
-                    tokens.append(Token(TT_DIV))
+                    tokens.append(Token(TT_DIV, pos_start_=self.pos))
                     self.advance()
                 case '(':
-                    tokens.append(Token(TT_LPAREN))
+                    tokens.append(Token(TT_LPAREN, pos_start_=self.pos))
                     self.advance()
                 case ')':
-                    tokens.append(Token(TT_RPAREN))
+                    tokens.append(Token(TT_RPAREN, pos_start_=self.pos))
                     self.advance()
                 case _:
+                    pos_start = self.pos.copy()
                     char = self.current_char
                     self.advance()
-                    return [], IllegalCharError("'"  + char + "'")
-    
+                    return [], IllegalCharError(pos_start, self.pos, "'"  + char + "'")
+
+        tokens.append(Token(TT_EOF, pos_start_=self.pos))
         return tokens, None
 
 
 # This function is what should be called outside this file
-def run_lexer(text):
-    lexer = Lexer(text)
+def run(fn, text):
+    lexer = Lexer(fn, text)
     tokens, error = lexer.make_tokens()
+    if error:
+        return None, error
 
-    return tokens, error
+    parser_ = Parser(tokens)
+    ast = parser_.parse()
+
+    return ast.node, ast.error
