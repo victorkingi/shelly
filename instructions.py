@@ -19,7 +19,7 @@ cache_state = {
     'sales': {},
     'purchases': {},
     'eggs_collected': {},
-    'dead_sick': {},
+    'dead_sick': {}
     'trades': {} 
 }
 instructions_executed = {}
