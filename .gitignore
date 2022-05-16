@@ -128,7 +128,7 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# other
+# others
 rand_inp/
 
 core101-3afde-firebase-adminsdk-sxm20-194a475b51.json
