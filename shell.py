@@ -6,7 +6,8 @@ import sys
 if __name__ == '__main__':
     while True:
         text = input('basic > ')
-        ast, error, _ = run('<stdin>', str(2**549976986543))
+        ast, error, total = run('<stdin>', text)
+        print(ast, not error, total)
 
         if error:
             print(error.as_string())

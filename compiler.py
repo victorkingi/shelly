@@ -87,6 +87,7 @@ class Compiler:
 
     def visit_BinOpNode(self, node):
         res = RTResult()
+        
         left = res.register(self.visit(node.left_node))
         if res.error:
             return res

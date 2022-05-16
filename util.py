@@ -1,5 +1,19 @@
 # UTILITIES
 
+import hashlib
+
+def recalculate_root_hash(collection_name):
+    hashes = ''
+    for key in cache_state[collection_name]:
+        if key != 'state':
+            hashes += cache_state[collection_name][key]['tx_hash']
+    
+    print("all hashes", hashes)
+    h = hashlib.sha512()
+    h.update(hashes.encode())
+    return h.hexdigest()
+
+
 def string_with_arrows(text, pos_start, pos_end):
     result = ''
 

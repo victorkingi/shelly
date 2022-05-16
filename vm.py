@@ -19,6 +19,7 @@ class VM:
                 # print("before2", self.stack.get_stack())
                 self.stack = inst_mapping[str(val[0])](self.stack, val[1])
                 # print("after2", self.stack.get_stack())
+
     
     def get(self):
         return self.stack.get_stack()

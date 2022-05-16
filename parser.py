@@ -61,6 +61,7 @@ class Parser:
 
     def bin_op(self, func, ops):
         res = ParseResult()
+        
         left = res.register(func())
         if res.error:
             return res
