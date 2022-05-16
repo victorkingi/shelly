@@ -26,6 +26,14 @@ instructions_executed = {}
 last_jump = -1                                  # keep track of last location before jump so as to go back once jump is called again
 last_instr = ''                                 # last instruction before a jump
 
+def dup(stack, pc=None, analysed=None):
+    a = stack.peek()
+    stack.push(a)
+    pc += 1
+    instructions_executed[str(pc)] = DUP
+    return stack, pc
+
+
 def push(stack, elem, pc=None, analysed=None) :
     stack.push(elem)
     pc += 1
@@ -71,7 +79,7 @@ def div(stack, pc=None, analysed=None) :
 
 def stop(stack, pc=None, analysed=None):
     a = stack.pop()
-    if not a:
+    if a:
         return stack, -1
     else:
         # operation failed
@@ -402,8 +410,32 @@ def update_cache(stack, pc=None, analysed=None) :
                     instructions_executed[str(pc)] = UPDATECACHE
 
 
+# followed by jumpif
+def finalise(stack, pc=None, analysed=None):
+    # everytime create/delete doc is called, collection name is pushed to stack
+    # at this point, the stack should only have collection names
+    collection_names = set(stack.get_stack())
+    stack.clear_stack()
+    if not stack.is_empty():
+        return None, None
+
+    for name in collection_names:
+        hashes = ''
+        for key in cache_state[name]:
+            if key != 'state':
+                # get all values in dict - hash
+                # hash them
+                # if hashed != tx_hash
+                # hashes in tx don't match
+                # return None, None
+        
+        # hash the concated string
+        # if hash == root_hash
+        # push 1, jumps to Stop
+
 inst_mapping = {
     str(PUSH): push,
+    str(DUP): dup,
     str(ADD): add,
     str(MUL): mul,
     str(SUB): sub,
