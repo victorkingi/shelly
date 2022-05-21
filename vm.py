@@ -7,10 +7,11 @@ class VM:
     def __init__(self, code_):
         self.code = code_
         self.stack = Stack()
-        self.pc = -1             # program counter
+        self.pc = 0             # program counter
         self.analysed_code = {}
-        self.analysed_code['VALID_JUMPDEST'] = []
         self.analysed_code['VALID_JUMPIF'] = []
+        self.cache_state = {}
+        self.cache_accounts = {}
         self.analyse()
 
     def analyse(self):
@@ -19,36 +20,33 @@ class VM:
             self.analysed_code[str(i)] = val
             i += 1
         
-        for key, val in self.analysed_code.items():
-            if val == JUMPDEST:
-                self.analysed_code['VALID_JUMPDEST'].append(key)
-            elif val == JUMPIF:
-                self.analysed_code['VALID_JUMPIF'].append(key)
         
-        if len(self.analysed_code['VALID_JUMPIF']) != len(self.analysed_code['VALID_JUMPDEST']):
-            raise RuntimeError("jump array length not equal to jump dest")
+        for key in self.analysed_code:
+            if len(self.analysed_code[key]) != 0:
+                if self.analysed_code[key][0] == JUMPIF:
+                    self.analysed_code['VALID_JUMPIF'].append(key)
+        
+        
 
     
     def execute(self):
         while self.pc < len(self.code):
             val = self.analysed_code[str(self.pc)]
+            #print(val)
+            #print("Stack", self.stack.get_stack())
 
             if len(val) < 2:
-                # print("before1", self.stack.get_stack())
-                self.stack, self.pc = inst_mapping[val[0]](self.stack, pc=self.pc, analysed=self.analysed_code)
-                # print("after1", self.stack.get_stack())
+                self.stack, self.pc, self.cache_state, self.cache_accounts = inst_mapping[str(val[0])](self.stack, pc=self.pc, analysed=self.analysed_code)
             else:
-                # print("before2", self.stack.get_stack())
-                self.stack, self.pc = inst_mapping[val[0]](self.stack, val[1], pc=self.pc, analysed=self.analysed_code)
-                # print("after2", self.stack.get_stack())
+                self.stack, self.pc, self.cache_state, self.cache_accounts = inst_mapping[str(val[0])](self.stack, val[1], pc=self.pc, analysed=self.analysed_code)
             
             if self.pc == -1:
                 # successful completion
                 print("execution success")
-                return None
+                return self.cache_state, self.cache_accounts
             
-            if self.stack is None and self.pc is None:
+            if self.stack is None and self.pc is None and self.cache_state is None and self.cache_accounts is None:
                 # execution failed
                 print("execution failed")
-                return None
+                return None, None
     

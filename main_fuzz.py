@@ -10,6 +10,11 @@ with atheris.instrument_imports():
 
 def TestLexer(data):
   input_ = data.decode(errors='ignore')
+  ans = 0
+  try:
+    ans = eval(input_)
+  except (SyntaxError, TypeError, ZeroDivisionError, ValueError, NameError) as e:
+    pass
 
   try:
     ast, error, total_lexed = run(fn=input_, text=input_)
@@ -26,11 +31,11 @@ def TestLexer(data):
           vm_.execute()
           final_ans = vm_.pop()
 
-          ans = eval(input_)
+          
           if ans != final_ans:
             raise RuntimeError(f"Invalid evaluation, got {final_ans}, expected {ans}")
 
-  except (SyntaxError, TypeError, ZeroDivisionError, RecursionError) as e:
+  except RecursionError as e:
     pass
       
 
