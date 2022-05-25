@@ -15,14 +15,6 @@ with atheris.instrument_imports():
 
 def TestLexer(data):
   input_ = data.decode(errors='ignore')
-  ans = Decimal('nan')
-
-  try:
-    ans = eval(input_)
-    ans = Decimal(f'{ans}')
-    ans = ans.quantize(TWOPLACES)
-  except (OverflowError, SyntaxError, TypeError, ZeroDivisionError, ValueError, NameError, AttributeError, InvalidOperation, MemoryError) as e:
-    pass
 
   try:
     ast, error, total_lexed = run(fn=input_, text=input_)
@@ -39,15 +31,14 @@ def TestLexer(data):
         vm_ = VM(compiler_.global_code)
         final_ans, state, acc = vm_.execute()
 
-        if final_ans.is_nan() and ans.is_nan():
-          raise RuntimeError(f"Invalid evaluation, got {final_ans}, expected {ans}")
+        if final_ans.is_nan():
+          raise RuntimeError(f"Invalid evaluation, got NaN")
 
 
         if state is not None or acc is not None:
           raise RuntimeError(f"Invalid evaluation, state or account were not none, {state}, {acc}")
-  
 
-  except RecursionError as e:
+  except RecursionError:
     pass
       
 
