@@ -2,6 +2,7 @@
 from opcodes import *
 from util import get_collection_hashes
 from functools import reduce
+from decimal import *
 import time
 import hashlib
 
@@ -9,6 +10,8 @@ import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import firestore
 
+getcontext().traps[FloatOperation] = True
+TWOPLACES = Decimal(10) ** -2 
 
 cred = credentials.Certificate("core101-3afde-firebase-adminsdk-sxm20-194a475b51.json")
 firebase_admin.initialize_app(cred)
@@ -53,13 +56,13 @@ def dup(stack, pc=None, analysed=None):
 
 
 def push(stack, elem, pc=None, analysed=None) :
-    if isinstance(elem, float) or isinstance(elem, str):
+    if isinstance(elem, Decimal) or isinstance(elem, str):
         stack.push(elem)
         pc += 1
         instructions_executed[str(pc)] = PUSH
         return stack, pc, cache_state, cache_accounts
     else:
-        print("Attempted to push non str or float")
+        print("Attempted to push not a str or a decimal type", type(elem))
         return None, None, None, None
 
 
@@ -100,6 +103,27 @@ def div(stack, pc=None, analysed=None) :
 
 
 def stop(stack, pc=None, analysed=None):
+    if stack.size() == 1:
+        empty_state = { 
+            'sales': {},
+            'purchases': {},
+            'eggs_collected': {},
+            'dead_sick': {},
+            'trades': {}
+        }
+        empty_accounts = {}
+        if empty_accounts == cache_accounts and empty_state == cache_state:
+            # successful exit
+            val = stack.pop()
+            try:
+                val = val.quantize(TWOPLACES)
+            except InvalidOperation:
+                pass
+            
+            stack.push(val)
+            return stack, -1, cache_state, cache_accounts
+
+
     if stack.size():
         print("Stack still contains:", stack.get_stack())
         return None, None, None, None
@@ -338,12 +362,12 @@ def update_cache(stack, pc=None, analysed=None) :
 
             update_attempted = 0
 
-
+            #TODO replace tx_hash queries with id, hence, all_ids will be key value of id and submitted_on
             # try applying delete and create operations until hashes match
             if oldest['tx_hash'] != local_oldest.get('tx_hash', False):
                 operation_done = oldest['op'] # can be delete or create
                 if operation_done == CREATE:
-                    cache_state[collection_name][oldest['id']] = {
+                    cache_state[collection_name]['temp_'+oldest['id']] = {
                         'tx_hash': oldest['tx_hash'],
                         'submitted_on': oldest['submitted_on']
                     }
@@ -359,7 +383,7 @@ def update_cache(stack, pc=None, analysed=None) :
             if second['tx_hash'] != local_second.get('tx_hash', False):
                 operation_done = second['op'] # can be delete or create
                 if operation_done == CREATE:
-                    cache_state[collection_name][second['id']] =  {
+                    cache_state[collection_name]['temp_'+second['id']] =  {
                         'tx_hash': second['tx_hash'],
                         'submitted_on': second['submitted_on']
                     }
@@ -375,7 +399,7 @@ def update_cache(stack, pc=None, analysed=None) :
             if newest['tx_hash'] != local_newest.get('tx_hash', False):
                 operation_done = newest['op'] # can be delete or create
                 if operation_done == CREATE:
-                    cache_state[collection_name][newest['id']] =  {
+                    cache_state[collection_name]['temp_'+newest['id']] =  {
                         'tx_hash': newest['tx_hash'],
                         'submitted_on': newest['submitted_on']
                     }
@@ -383,6 +407,7 @@ def update_cache(stack, pc=None, analysed=None) :
                     update_attempted = 1
 
                 elif operation_done == DELETE:
+                    #TODO check  if temp_id exists first if not, proceed, else delete the temp_id
                     del cache_state[collection_name][newest['id']]
                     local_newest = newest
                     update_attempted = 1
@@ -488,7 +513,7 @@ def update_cache(stack, pc=None, analysed=None) :
 
 # TODO: replace 1634774400000.0 with time.time_ns()
 def timestamp_now(stack, pc=None, analysed=None):
-    stack.push(float(1.6530634936213117e+18))
+    stack.push(Decimal('1.6530634936213117e+18'))
     pc += 1
     instructions_executed[str(pc)] = NOW
     return stack, pc, cache_state, cache_accounts
@@ -719,7 +744,18 @@ JUMPIF
 STOP
 
 '''
+#TODO Have 2 opcodes, JUMPIF(after analysis, each jumpif in the code should have a destination map to it, to signify end of jumped
+# to destination, ENDJUMP opcode called, doesn't read anything from stack but also analysis contains the jumpif location+1, 
+# changes program counter to that)
+# TODO At the end of main function execution, have STOP(reads last value in stack(should contain only one element) if stack is empty)
+# an error occured. After the stop, include all jump destination code in order of when jumpif was called
 
+
+#TODO break this into steps:
+# final_call() pushes 1,
+# pops final call, pushes at end, get_collection_name_and_total_txs_in_it(pushes, coll_name, tx_ids, total_txs),
+# get_tx(pops num of elements, decreases by 1, if 0, push end_inner_loop_signal else pushes back, pushes tx required data & num),
+# hash them, compare, if true, inner_loop check if done jump_to get_collection_name else jump_to next tx
 # followed by jumpif
 def prep_finalise_data(stack, pc=None, analysed=None):
     # everytime create/delete doc is called, collection name is pushed to stack
@@ -779,42 +815,29 @@ def prep_finalise_data(stack, pc=None, analysed=None):
                 stack.push(name)
                 stack.push(key)
                 if name == 'sales':
-                    stack.push(cache_state[name][key]['tray_no'])
-                    stack.push(cache_state[name][key]['tray_price'])
                     stack.push(cache_state[name][key]['buyer'])
                     stack.push(cache_state[name][key]['date']['unix']+cache_state[name][key]['date']['locale'])
                     stack.push(cache_state[name][key]['section'])
-                    stack.push(5)
+                    stack.push(3)
                 elif name == 'purchases':
-                    stack.push(cache_state[name][key]['item_no'])
-                    stack.push(cache_state[name][key]['item_price'])
                     stack.push(cache_state[name][key]['item_name'])
                     stack.push(cache_state[name][key]['date']['unix']+cache_state[name][key]['date']['locale'])
                     stack.push(cache_state[name][key]['section'])
-                    stack.push(5)
+                    stack.push(3)
                 elif name == 'dead_sick':
-                    stack.push(cache_state[name][key]['number'])
                     stack.push(cache_state[name][key]['date']['unix']+cache_state[name][key]['date']['locale'])
                     stack.push(cache_state[name][key]['section'])
                     stack.push(cache_state[name][key]['location'])
-                    stack.push(4)
+                    stack.push(3)
                 elif name == 'eggs_collected':
-                    stack.push(cache_state[name][key]['a1'])
-                    stack.push(cache_state[name][key]['a2'])
-                    stack.push(cache_state[name][key]['b1'])
-                    stack.push(cache_state[name][key]['b2'])
-                    stack.push(cache_state[name][key]['c1'])
-                    stack.push(cache_state[name][key]['c2'])
-                    stack.push(cache_state[name][key]['house'])
-                    stack.push(cache_state[name][key]['broken'])
-                    stack.push(cache_state[name][key]['trays_collected'])
                     stack.push(cache_state[name][key]['date']['unix']+cache_state[name][key]['date']['locale'])
-                    stack.push(10)
+                    stack.push(1)
                 elif name == 'trades':
                     stack.push(cache_state[name][key]['amount'])
                     stack.push(cache_state[name][key]['from'])
                     stack.push(cache_state[name][key]['to'])
                     stack.push(cache_state[name][key]['sale_hash'])
+                    #TODO make a check that sale hash and purchase hash both are never non-empty at the same time
                     stack.push(cache_state[name][key]['purchase_hash'])
                     stack.push(cache_state[name][key]['date']['unix']+cache_state[name][key]['date']['locale'])
                     stack.push(5)

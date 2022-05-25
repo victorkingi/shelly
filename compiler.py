@@ -1,5 +1,7 @@
 # COMPILER
 
+from decimal import *
+
 from opcodes import *
 from constants import *
 from nodes import NumberNode, UnaryOpNode, BinOpNode
@@ -7,7 +9,7 @@ from error import NoVisitMethodError, RuntimeError
 
 class Number:
     def __init__(self, value_):
-        self.value = value_
+        self.value = Decimal(f'{value_}')
         self.set_pos()
     
 
@@ -74,6 +76,7 @@ class Compiler:
         method_name = f'visit_{type(node).__name__}'
         method = getattr(self, method_name, self.no_visit_method)
         return method(node)
+
     
     def no_visit_method(self, node):
         res = RTResult()
@@ -81,7 +84,7 @@ class Compiler:
     
     def visit_NumberNode(self, node):
         num = Number(node.tok.value).set_pos(node.pos_start, node.pos_end)
-        self.global_code.append([PUSHNUM, num.value])
+        self.global_code.append([PUSH, num.value])
         return RTResult().success(num)
 
 
@@ -122,7 +125,7 @@ class Compiler:
         
         if node.op_tok.type == TT_MINUS:
             num, code, error = num.mul(Number(-1), self.global_code)
-            code.insert(-1, [PUSHNUM, -1])
+            code.insert(-1, [PUSH, Number(-1).value])
         
         if error:
             return res.failure(error)

@@ -1,19 +1,27 @@
 import atheris
 import sys
+from decimal import *
+
+getcontext().traps[FloatOperation] = True
+TWOPLACES = Decimal(10) ** -2 
 
 
 with atheris.instrument_imports():
     from lexer import Lexer, run
     from compiler import Compiler
     from vm import VM
+    from opcodes import STOP
 
 
 def TestLexer(data):
   input_ = data.decode(errors='ignore')
-  ans = 0
+  ans = Decimal('nan')
+
   try:
     ans = eval(input_)
-  except (SyntaxError, TypeError, ZeroDivisionError, ValueError, NameError) as e:
+    ans = Decimal(f'{ans}')
+    ans = ans.quantize(TWOPLACES)
+  except (OverflowError, SyntaxError, TypeError, ZeroDivisionError, ValueError, NameError, AttributeError, InvalidOperation, MemoryError) as e:
     pass
 
   try:
@@ -27,13 +35,17 @@ def TestLexer(data):
       result = compiler_.visit(ast)
       
       if not result.error:
-          vm_ = VM(compiler_.global_code)
-          vm_.execute()
-          final_ans = vm_.pop()
+        compiler_.global_code.append([STOP])
+        vm_ = VM(compiler_.global_code)
+        final_ans, state, acc = vm_.execute()
 
-          
-          if ans != final_ans:
-            raise RuntimeError(f"Invalid evaluation, got {final_ans}, expected {ans}")
+        if final_ans.is_nan() and ans.is_nan():
+          raise RuntimeError(f"Invalid evaluation, got {final_ans}, expected {ans}")
+
+
+        if state is not None or acc is not None:
+          raise RuntimeError(f"Invalid evaluation, state or account were not none, {state}, {acc}")
+  
 
   except RecursionError as e:
     pass

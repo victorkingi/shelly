@@ -89,7 +89,6 @@ class ParseResult:
     def __init__(self):
         self.error = None
         self.node = None
-        self.total_parsed = None
     
 
     def register(self, res):

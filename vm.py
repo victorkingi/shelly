@@ -2,6 +2,7 @@
 from stack import Stack
 from instructions import inst_mapping
 from opcodes import *
+from constants import MULTIPLIER
 
 class VM:
     def __init__(self, code_):
@@ -12,13 +13,20 @@ class VM:
         self.analysed_code['VALID_JUMPIF'] = []
         self.cache_state = {}
         self.cache_accounts = {}
+        self.total_mul_ops = 0
+        self.total_div_ops = 0
         self.analyse()
 
     def analyse(self):
         i = 0
+
         for val in self.code:
             self.analysed_code[str(i)] = val
             i += 1
+            if val[0] == MUL:
+                self.total_mul_ops += 1
+            elif val[0] == DIV:
+                self.total_div_ops += 1
         
         
         for key in self.analysed_code:
@@ -42,11 +50,15 @@ class VM:
             
             if self.pc == -1:
                 # successful completion
-                print("execution success")
-                return self.cache_state, self.cache_accounts
+                #print("execution success")
+                if self.stack.size():
+                    # no update was made to firestore, hence just return computed output
+                    return self.stack.pop(), None, None
+                
+                return None, self.cache_state, self.cache_accounts
             
             if self.stack is None and self.pc is None and self.cache_state is None and self.cache_accounts is None:
                 # execution failed
-                print("execution failed")
-                return None, None
+                #print("execution failed")
+                return None, None, None
     
