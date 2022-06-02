@@ -1,14 +1,16 @@
 # Instructions
-from opcodes import *
-from util import get_collection_hashes
 from functools import reduce
 from decimal import *
-import time
-import hashlib
-
-import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import firestore
+
+from opcodes import *
+from util import get_collection_hashes
+from log_ import log
+
+import time
+import hashlib
+import firebase_admin
 
 getcontext().traps[FloatOperation] = True
 TWOPLACES = Decimal(10) ** -2 
@@ -28,18 +30,71 @@ cache_state = {
     'trades': {}
 }
 cache_accounts = {}
-
 instructions_executed = {}
-last_jump = -1                                  # keep track of last location before jump so as to go back once jump is called again
-last_jump_2 = -1
-last_instr = ''                                 # last instruction before a jump
-jump_dest = -1
-jump_dest_2 = -1
-
-new_entry_counter = 0
+new_entry_counter = -1              # keeps track of how many new entries we have
 
 
-def dup(stack, pc=None, analysed=None):
+def push(elem=None, stack=None, memory=None, pc=None, analysed=None):
+    pc += 2
+    instructions_executed[str(pc)] = PUSH
+
+    if isinstance(elem, float) or isinstance(elem, int):
+        elem = Decimal(elem)
+
+    if isinstance(elem, Decimal) or isinstance(elem, str):
+        stack.push(elem)
+        return stack, memory, pc, cache_state, cache_accounts
+    else:
+        log.error(f"Attempted to push not a str or a decimal type, {type(elem)}")
+        return None, None, None, None, None
+
+
+def add(stack=None, memory=None, pc=None, analysed=None):
+    pc += 1
+    instructions_executed[str(pc)] = ADD
+
+    a = stack.pop()
+    b = stack.pop()
+    stack.push(b + a)
+    
+    return stack, memory, pc, cache_state, cache_accounts
+
+
+def sub(stack=None, memory=None, pc=None, analysed=None):
+    pc += 1
+    instructions_executed[str(pc)] = SUB
+
+    a = stack.pop()
+    b = stack.pop()
+    stack.push(b - a)
+    return stack, memory, pc, cache_state, cache_accounts
+
+
+def mul(stack=None, memory=None, pc=None, analysed=None):
+    pc += 1
+    instructions_executed[str(pc)] = MUL
+
+    a = stack.pop()
+    b = stack.pop()
+    stack.push(b * a)
+    return stack, memory, pc, cache_state, cache_accounts
+
+
+def div(stack=None, memory=None, pc=None, analysed=None):
+    pc += 1
+    instructions_executed[str(pc)] = DIV
+
+    a = stack.pop()
+    b = stack.pop()
+    stack.push(b / a)
+    
+    return stack, memory, pc, cache_state, cache_accounts
+
+
+def dup(stack=None, memory=None, pc=None, analysed=None):
+    pc += 1
+    instructions_executed[str(pc)] = DUP
+
     num = stack.pop()
     arr = []
 
@@ -47,62 +102,16 @@ def dup(stack, pc=None, analysed=None):
         arr.append(stack.pop())
 
     arr.reverse() # preserve LIFO
-    # print("values dup:", arr)
     stack.push(arr)
     stack.push(arr)
+
+    return stack, memory, pc, cache_state, cache_accounts
+
+
+def stop(stack=None, memory=None, pc=None, analysed=None):
     pc += 1
-    instructions_executed[str(pc)] = DUP
-    return stack, pc, cache_state, cache_accounts
+    instructions_executed[str(pc)] = STOP
 
-
-def push(stack, elem, pc=None, analysed=None) :
-    if isinstance(elem, Decimal) or isinstance(elem, str):
-        stack.push(elem)
-        pc += 1
-        instructions_executed[str(pc)] = PUSH
-        return stack, pc, cache_state, cache_accounts
-    else:
-        print("Attempted to push not a str or a decimal type", type(elem))
-        return None, None, None, None
-
-
-def add(stack, pc=None, analysed=None) :
-    a = stack.pop()
-    b = stack.pop()
-    stack.push(b + a)
-    pc += 1
-    instructions_executed[str(pc)] = ADD
-    return stack, pc, cache_state, cache_accounts
-
-
-def sub(stack, pc=None, analysed=None) :
-    a = stack.pop()
-    b = stack.pop()
-    stack.push(b - a)
-    pc += 1
-    instructions_executed[str(pc)] = SUB
-    return stack, pc, cache_state, cache_accounts
-
-
-def mul(stack, pc=None, analysed=None) :
-    a = stack.pop()
-    b = stack.pop()
-    stack.push(b * a)
-    pc += 1
-    instructions_executed[str(pc)] = MUL
-    return stack, pc, cache_state, cache_accounts
-
-
-def div(stack, pc=None, analysed=None) :
-    a = stack.pop()
-    b = stack.pop()
-    stack.push(b / a)
-    pc += 1
-    instructions_executed[str(pc)] = DIV
-    return stack, pc, cache_state, cache_accounts
-
-
-def stop(stack, pc=None, analysed=None):
     if stack.size() == 1:
         empty_state = { 
             'sales': {},
@@ -118,205 +127,154 @@ def stop(stack, pc=None, analysed=None):
             try:
                 val = val.quantize(TWOPLACES)
             except InvalidOperation:
-                pass
+                log.error(f"Invalid Decimal Operation; stack value: {val}")
+                return None, None, None, None, None
+            
+            if val.is_nan():
+                log.error(f"NaN value popped from stack, {val}")
+                return None, None, None, None, None
             
             stack.push(val)
-            return stack, -1, cache_state, cache_accounts
+            return stack, memory, -1, cache_state, cache_accounts
 
 
     if stack.size():
-        print("Stack still contains:", stack.get_stack())
-        return None, None, None, None
+        log.error(f"Stack still contains: {stack.get_stack()}")
+        return None, None, None, None, None
 
     # successful exit
-    return stack, -1, cache_state, cache_accounts
-
+    return stack, memory, -1, cache_state, cache_accounts
 
 
 # pushes root hash of a collection to stack
-def root_hash(stack, pc=None, analysed=None) :
+def root_hash(stack=None, memory=None, pc=None, analysed=None):
+    pc += 1
+    instructions_executed[str(pc)] = ROOTHASH
+
     collection_name = stack.pop()
 
     stack.push(cache_state[collection_name]['state']['root_hash'])
+    return stack, memory, pc, cache_state, cache_accounts
+
+
+def sha512(stack=None, memory=None, pc=None, analysed=None):
     pc += 1
-    instructions_executed[str(pc)] = ROOTHASH
-    return stack, pc, cache_state, cache_accounts
+    instructions_executed[str(pc)] = SHA512
 
-
-def jump_if(stack, pc=None, analysed=None) :
-    cond = stack.pop()
-
-    if cond:
-        if last_jump != -1:
-            pc = last_jump
-            instructions_executed[str(pc)] = JUMPIF
-            return stack, pc, cache_state, cache_accounts
-        
-        if last_jump_2 != -1:
-            pc = last_jump_2
-            instructions_executed[str(pc)] = JUMPIF
-            return stack, pc, cache_state, cache_accounts
-
-        if CONFIRMCACHE == last_instr:
-            last_instr = ''
-            print("root hash doesn't match even after full update")
-            return None, None, None, None
-        
-        dest = stack.pop() # program counter number
-        pc = dest
-        instructions_executed[str(pc)] = JUMPIF
-        return stack, pc, cache_state, cache_accounts
-    else:
-        if last_jump != -1:
-            pc = last_jump
-            last_jump = -1
-            instructions_executed[str(pc)] = JUMPIF
-            return stack, pc, cache_state, cache_accounts
-        
-        pc += 1
-        instructions_executed[str(pc)] = JUMPIF
-        return stack, pc, cache_state, cache_accounts
-
-
-def sha512(stack, pc=None, analysed=None) :
     m = hashlib.sha512()
-
     num_of_elements = stack.pop()
-
-    if not num_of_elements:
-        # num_elements will NEVER be 0, hence this if statement acts as a signal received
-        # to break from an infinite loop
-        if jump_dest != -1:
-            pc = jump_dest
-            last_jump = -1
-            jump_dest = -1
-        elif jump_dest_2 != -1:
-            pc = jump_dest_2
-            last_jump_2 = -1
-            jump_dest_2 = -1
-        else:
-            print("Errored jump instruction")
-            return None, None, None, None
-        
-        instructions_executed[str(pc)] = 'signaled_exit_loop'
-        return stack, pc, cache_state, cache_accounts
-
-
     to_hash = ''
 
     for i in range(int(num_of_elements)):
         val = stack.pop()
         to_hash += str(val)
     
-    #print("all hashes:", to_hash)
+    log.debug(f"all hashes: {to_hash}")
     m.update(to_hash.encode())
     stack.push(m.hexdigest())
 
-    pc += 1
-    instructions_executed[str(pc)] = SHA512
-    return stack, pc, cache_state, cache_accounts
+    return stack, memory, pc, cache_state, cache_accounts
 
 
 # pushes tx hash to stack given collection and id
-def tx_hash(stack, pc=None, analysed=None):
-    calculated_hash = stack.pop()
+def tx_hash(stack=None, memory=None, pc=None, analysed=None):
+    pc += 1
+    instructions_executed[str(pc)] = TXHASH
+
     id = stack.pop()
-    name = stack.pop()
+    collection_name = stack.pop()
 
-    stack.push(cache_state[name][id]['tx_hash'])
-    stack.push(calculated_hash)
+    stack.push(cache_state[collection_name][id]['tx_hash'])
+
+    return stack, memory, pc, cache_state, cache_accounts
 
 
-def is_zero(stack, pc=None, analysed=None) :
-    val = stack.pop()
-
-    stack.push(1 if val == 0 else 0)
+def is_zero(stack=None, memory=None, pc=None, analysed=None):
     pc += 1
     instructions_executed[str(pc)] = ISZERO
-    return stack, pc, cache_state, cache_accounts
+
+    val = stack.pop()
+
+    stack.push(Decimal(1) if val == Decimal(0) else Decimal(0))
+
+    return stack, memory, pc, cache_state, cache_accounts
 
 
-def eq(stack, pc=None, analysed=None) :
+def eq(stack=None, memory=None, pc=None, analysed=None):
+    pc += 1
+    instructions_executed[str(pc)] = EQ
+
     a = stack.pop()
     b = stack.pop()
 
-    stack.push(1 if a == b else 0)
+    stack.push(Decimal(1) if a == b else Decimal(0))
+    return stack, memory, pc, cache_state, cache_accounts
+
+
+# followed by sha512
+def collection_hashes_to_hash(stack=None, memory=None, pc=None, analysed=None):
     pc += 1
-    instructions_executed[str(pc)] = EQ
-    return stack, pc, cache_state, cache_accounts
+    instructions_executed[str(pc)] = COLLHASH
 
-
-# followed by jumpif, always after an update_cache
-def confirm_cache(stack, pc=None, analysed=None):
     collection_name = stack.pop()
 
     cache_hashes = get_collection_hashes(collection_name, cache_state)
     cache_hashes.reverse()
 
-    pc += 1
-
-    stack.push(collection_name)
     stack.push(cache_hashes)
     stack.push(len(cache_hashes))
-
-    # we know that the next instruction will be a jumpif
-    stack.push(analysed['VALID_JUMPDEST'][pc+1])
-    last_jump = pc+2
-    last_instr = CONFIRMCACHE
-
-    stack.push(1)
-    instructions_executed[str(pc)] = CONFIRMCACHE
-    return stack, pc, cache_state, cache_accounts
+    return stack, memory, pc, cache_state, cache_accounts
 
 
-# followed by a jumpif
-def get_state(stack, pc=None, analysed=None):
+# followed by sha512
+def tx_values_to_hash(stack=None, memory=None, pc=None, analysed=None):
+    pc += 1
+    instructions_executed[str(pc)] = TXVALSHASH
+
+    tx_hash_ = stack.pop()
+    collection_name = stack.pop()
+
+    values_to_hash = get_tx_data_to_hash(name=collection_name, cache_state=cache_state, tx_hash_=tx_hash_)
+    values_to_hash.reverse()
+
+    stack.push(values_to_hash)
+    stack.push(len(values_to_hash))
+
+    return stack, memory, pc, cache_state, cache_accounts
+
+
+def get_state(stack=None, memory=None, pc=None, analysed=None):
+    pc += 1
+    instructions_executed[str(pc)] = UPDATESTATE
+
     collection_name = stack.pop()
     collection_ref = db.collection(collection_name)
     state_dict = collection_ref.document('state').get().to_dict()
 
     if not cache_state[collection_name]:
-        print("no state cache exists, adding...")
+        log.info("no state cache exists, adding...")
         cache_state[collection_name]['state'] = state_dict
 
-        pc += 1
-        stack.push(0)
-        instructions_executed[str(pc)] = UPDATESTATE
-        return stack, pc, cache_state, cache_accounts
+        return stack, memory, pc, cache_state, cache_accounts
     else:
         local_hash = cache_state[collection_name]['state']['root_hash']
+
         if local_hash == state_dict['root_hash']:
-            pc += 1
-            stack.push(0)
-            instructions_executed[str(pc)] = UPDATESTATE
-            return stack, pc, cache_state, cache_accounts
+            return stack, memory, pc, cache_state, cache_accounts
         
-        pc += 1
-        cache_state[collection_name] = {}
-        stack.push(collection_name)
-        stack.push(analysed['VALID_JUMPDEST'][pc+1]) # this location will have updatecache opcode
-        stack.push(1)
-        instructions_executed[str(pc)] = UPDATESTATE
-        return stack, pc, cache_state, cache_accounts
-
-
-# only called when comparing 2 hashes if don't match exit None
-def exit_loop(stack, pc=None, analysed=None):
-    a = stack.peek()
-    if not a:
-        print("Hashes don't match loop exited")
-        return None, None, None, None
-    else:
-        pc += 1
-    
-    return stack, pc, cache_state, cache_accounts
+        else:
+            log.error("root hashes don't match")
+            return None, None, None, None, None
     
 
 # attempts to update the cache with latest values. Note that we will only need
 # to call this function if we do create/delete operations, or plainly just need to confirm state. Most operations i.e.
 # checking if a document exists require just the state document
 # followed by a jumpif
-def update_cache(stack, pc=None, analysed=None) :
+def update_cache(stack=None, memory=None, pc=None, analysed=None):
+    pc += 1
+    instructions_executed[str(pc)] = UPDATECACHE
+
     collection_name = stack.pop()
 
     collection_ref = db.collection(collection_name)
@@ -324,32 +282,24 @@ def update_cache(stack, pc=None, analysed=None) :
     
     if not cache_state[collection_name]:
         # no cache exists, proceed with query
-        print("no cache exists")
+        log.info("no cache exists, querying...")
         query = collection_ref.order_by('submitted_on', direction=firestore.Query.ASCENDING)
         results = query.stream()
         cache_state[collection_name]['state'] = state_dict
         for doc in results:
             cache_state[collection_name][doc.id] = doc.to_dict()
-        
-        pc += 1
-        stack.push(collection_name)
-        stack.push(0)
-        instructions_executed[str(pc)] = UPDATECACHE
-        return stack, pc, cache_state, cache_accounts
+    
+        return stack, memory, pc, cache_state, cache_accounts
     
     else:
-        print("cache exists confirming validity...")
+        log.info("cache exists confirming validity...")
         # check if state hashes match
         root_hash = state_dict['root_hash']
         local_hash = cache_state[collection_name]['state']['root_hash']
         
         if local_hash == root_hash:
-            print("hashes match no need for update")
-            pc += 1
-            stack.push(collection_name)
-            stack.push(0)
-            instructions_executed[str(pc)] = UPDATECACHE
-            return stack, pc, cache_state, cache_accounts
+            log.info("hashes match no need for update")
+            return stack, memory, pc, cache_state, cache_accounts
         else:
             get_last_3_state_changes = state_dict['prev_3_states']
             oldest = get_last_3_state_changes['0']
@@ -362,10 +312,10 @@ def update_cache(stack, pc=None, analysed=None) :
 
             update_attempted = 0
 
-            #TODO replace tx_hash queries with id, hence, all_ids will be key value of id and submitted_on
             # try applying delete and create operations until hashes match
             if oldest['tx_hash'] != local_oldest.get('tx_hash', False):
                 operation_done = oldest['op'] # can be delete or create
+
                 if operation_done == CREATE:
                     cache_state[collection_name]['temp_'+oldest['id']] = {
                         'tx_hash': oldest['tx_hash'],
@@ -373,18 +323,22 @@ def update_cache(stack, pc=None, analysed=None) :
                     }
 
                     local_oldest = oldest
-                    update_attempted = 1
-                    
+                    update_attempted = 1                    
                 elif operation_done == DELETE:
-                    del cache_state[collection_name][oldest['id']]
+                    if cache_state[collection_name].get('temp_'+oldest['id'], False):
+                        del cache_state[collection_name]['temp_'+oldest['id']]
+                    else:
+                        del cache_state[collection_name][oldest['id']]
+
                     local_oldest = oldest
                     update_attempted = 1
 
             if second['tx_hash'] != local_second.get('tx_hash', False):
                 operation_done = second['op'] # can be delete or create
+
                 if operation_done == CREATE:
                     cache_state[collection_name]['temp_'+second['id']] =  {
-                        'tx_hash': second['tx_hash'],
+                        'tx_hash': oldest['tx_hash'],
                         'submitted_on': second['submitted_on']
                     }
 
@@ -392,23 +346,30 @@ def update_cache(stack, pc=None, analysed=None) :
                     update_attempted = 1
                 
                 elif operation_done == DELETE:
-                    del cache_state[collection_name][second['id']]
+                    if cache_state[collection_name].get('temp_'+second['id'], False):
+                        del cache_state[collection_name]['temp_'+second['id']]
+                    else:
+                        del cache_state[collection_name][second['id']]
+
                     local_second = second
                     update_attempted = 1
         
             if newest['tx_hash'] != local_newest.get('tx_hash', False):
                 operation_done = newest['op'] # can be delete or create
+
                 if operation_done == CREATE:
                     cache_state[collection_name]['temp_'+newest['id']] =  {
-                        'tx_hash': newest['tx_hash'],
+                        'tx_hash': oldest['tx_hash'],
                         'submitted_on': newest['submitted_on']
                     }
                     local_newest = newest
                     update_attempted = 1
 
                 elif operation_done == DELETE:
-                    #TODO check  if temp_id exists first if not, proceed, else delete the temp_id
-                    del cache_state[collection_name][newest['id']]
+                    if cache_state[collection_name].get('temp_'+newest['id'], False):
+                        del cache_state[collection_name]['temp_'+newest['id']]
+                    else:
+                        del cache_state[collection_name][newest['id']]
                     local_newest = newest
                     update_attempted = 1
             
@@ -421,24 +382,13 @@ def update_cache(stack, pc=None, analysed=None) :
                 # push all hashes to stack
                 cache_hashes = get_collection_hashes(collection_name, cache_state)
 
-                # this is to obey the stack law of LIFO(Last in First Out)
+                # obey stack law of LIFO(Last in First Out)
                 cache_hashes.reverse()
 
-                pc += 1
-
-                # jump destination incase we want to rexecute this function
-                stack.push(pc)
-
-                stack.push(collection_name)
                 stack.push(cache_hashes)
                 stack.push(len(cache_hashes))
 
-                # to make code easier to follow, each jump if has a jump dest
-                stack.push(analysed['VALID_JUMPDEST'][pc+1])
-
-                stack.push(1)
-                instructions_executed[str(pc)] = UPDATECACHE
-                return stack, pc, cache_state, cache_accounts
+                return stack, memory, pc, cache_state, cache_accounts
 
             else:
                 # final attempt at preventing a full query, get an array of all ids, perform set difference
@@ -447,7 +397,7 @@ def update_cache(stack, pc=None, analysed=None) :
                 update_attempted = 0
 
                 remote_ids = set(state_dict['all_ids'].keys())
-                local_ids = set(cache_state['sales'].keys())
+                local_ids = set(cache_state[collection_name].keys())
 
                 # in cache but not remote, means a delete happened
                 to_delete = local_ids - remote_ids
@@ -477,25 +427,14 @@ def update_cache(stack, pc=None, analysed=None) :
                     # this is to obey the stack law of LIFO(Last in First Out)
                     cache_hashes.reverse()
 
-                    pc += 1
-
-                    # jump destination incase we want to rexecute this function
-                    stack.push(pc)
-
-                    stack.push(collection_name)
                     stack.push(cache_hashes)
                     stack.push(len(cache_hashes))
 
-                    # to make code easier to follow, each jump if has a jump dest
-                    stack.push(analysed['VALID_JUMPDEST'][pc+1])
-
-                    stack.push(1)
-                    instructions_executed[str(pc)] = UPDATECACHE
-                    return stack, pc, cache_state, cache_accounts
+                    return stack, memory, pc, cache_state, cache_accounts
 
                 else:
                     # at this point, query all entries
-                    print("state changes many, doing full update...")
+                    log.info("state changes many, doing full update...")
                     query = collection_ref.order_by('submitted_on', direction=firestore.Query.ASCENDING)
                     results = query.stream()
                     cache_state[collection_name] = {}
@@ -505,50 +444,59 @@ def update_cache(stack, pc=None, analysed=None) :
                     
 
                     local_hash = cache_state[collection_name]['state']['root_hash']
-                    pc += 1
-                    stack.push(collection_name)
-                    stack.push(0)
-                    instructions_executed[str(pc)] = UPDATECACHE
+
+                    if local_hash != root_hash:
+                        log.error("hashes don't match after full query")
+                        return None, None, None, None, None
+                    
+                    return stack, memory, pc, cache_state, cache_accounts
 
 
 # TODO: replace 1634774400000.0 with time.time_ns()
-def timestamp_now(stack, pc=None, analysed=None):
-    stack.push(Decimal('1.6530634936213117e+18'))
+def timestamp_now(stack=None, memory=None, pc=None, analysed=None):
     pc += 1
     instructions_executed[str(pc)] = NOW
-    return stack, pc, cache_state, cache_accounts
+
+    stack.push(Decimal('1.6530634936213117e+18'))
+    return stack, memory, pc, cache_state, cache_accounts
 
 
+def swap(stack=None, memory=None, pc=None, analysed=None):
+    pc += 1
+    instructions_executed[str(pc)] = SWAP
 
-def swap(stack, pc=None, analysed=None):
     a = stack.pop()
     b = stack.pop()
     stack.push(a)
     stack.push(b)
+    return stack, memory, pc, cache_state, cache_accounts
+
+
+def create_address(stack=None, memory=None, pc=None, analysed=None):
     pc += 1
-    instructions_executed[str(pc)] = SWAP
-    return stack, pc, cache_state, cache_accounts
+    instructions_executed[str(pc)] = CADDR
 
-
-def create_address(stack, pc=None, analysed=None):
     address_name = stack.pop()
     amount = stack.pop()
     cache_accounts[address_name] = amount
-    pc += 1
-    instructions_executed[str(pc)] = CADDR
-    return stack, pc, cache_state, cache_accounts
+    return stack, memory, pc, cache_state, cache_accounts
 
 
-def delete_address(stack, pc=None, analysed=None):
-    address_name = stack.pop()
-    del cache_accounts[address_name]
+def delete_address(stack=None, memory=None, pc=None, analysed=None):
     pc += 1
     instructions_executed[str(pc)] = DADDR
-    return stack, pc, cache_state, cache_accounts
+
+    address_name = stack.pop()
+    del cache_accounts[address_name]
+    return stack, memory, pc, cache_state, cache_accounts
 
 
-def create_entry(stack, pc=None, analysed=None):
+def create_entry(stack=None, memory=None, pc=None, analysed=None):
+    pc += 1
+    instructions_executed[str(pc)] = CENTRY
+
     entry_name = stack.pop()
+    new_entry_counter += 1
 
     if entry_name == 'SELL':
         cache_state['sales'][f'new{new_entry_counter}'] = {}
@@ -581,7 +529,7 @@ def create_entry(stack, pc=None, analysed=None):
             val = stack.pop()
             cache_state['eggs_collected'][f'new{new_entry_counter}'][id] = val
         
-        #print(cache_state)
+        log.debug(f'{cache_state}')
 
     elif entry_name == 'TRADE':
         cache_state['trades'][f'new{new_entry_counter}'] = {}
@@ -591,20 +539,175 @@ def create_entry(stack, pc=None, analysed=None):
             cache_state['trades'][f'new{new_entry_counter}'][id] = val
     
     else:
-        print("Invalid entry")
-        return None, None, None, None
+        log.error("Invalid entry")
+        return None, None, None, None, None
     
-    pc += 1
-    instructions_executed[str(pc)] = CENTRY
-    return stack, pc, cache_state, cache_accounts
+    return stack, memory, pc, cache_state, cache_accounts
 
 
-def delete_entry(stack, pc=None, analysed=None):
-    address_name = stack.pop()
-    del cache_accounts[address_name]
+def delete_entry(stack=None, memory=None, pc=None, analysed=None):
     pc += 1
-    instructions_executed[str(pc)] = DADDR
-    return stack, pc, cache_state, cache_accounts
+    instructions_executed[str(pc)] = DENTRY
+
+    entry_id = stack.pop()
+    collection_name = stack.pop()
+
+    del cache_state[collection_name][entry_id]
+
+    return stack, memory, pc, cache_state, cache_accounts
+
+
+def prep_finalise_data(stack=None, memory=None, pc=None, analysed=None):
+    # everytime create/delete doc is called, collection name is pushed to stack
+    # at this point, the stack should only have collection names
+    collection_names = set(stack.get_stack())
+    stack.clear_stack()
+    if not stack.is_stack_empty():
+        return None, None, None, None, None
+
+    last_jump = pc+2
+    jump_dest = pc+7
+    last_jump_2 = jump_dest
+    jump_dest_2 = last_jump_2+6
+    stack.push(0) # signal first loop is done
+    for name in collection_names:
+        stack.push(name)
+        i = 0
+        for key in cache_state[name]:
+            if key != 'state' and key != 'prev_states':
+                stack.push(cache_state[name][key]['tx_hash'])
+                i += 1
+
+        stack.push(i)
+    
+    stack.push(0) # Signals second loop is done
+
+    for name in collection_names:
+        hashes = ''
+        '''
+        sales: section, date = { unix, string }, buyer, tray_price, tray_no, tx_hash, by
+         submitted_on = { unix, string }, local_nonce, global_nonce
+        
+        purchases: tx_hash, item_name, item_no, item_price, date = { unix, string }, by, section,
+         submitted_on = { unix, string }, local_nonce, global_nonce
+        
+        dead_sick: tx_hash, number, date = { unix, string }, by, section, location, reason, image_id, image_url
+         submitted_on = { unix, string }, local_nonce, global_nonce
+        
+        eggs_collected: tx_hash, a1, a2, b1, b2, c1, c2, broken, house, date = { unix, string }, by, trays_collected
+         submitted_on = { unix, string }, local_nonce, global_nonce
+        
+        trades: tx_hash, from, to, date = { unix, string }, sale_hash, purchase_hash, by,
+         submitted_on = { unix, string }, local_nonce, global_nonce, amount
+
+        '''
+        is_empty = 1
+
+        for key in cache_state[name]:
+            if key != 'state' and key != 'prev_states':
+                # get all values in dict - hash
+                # hash them
+                # if hashed != tx_hash
+                # hashes in tx don't match
+                # return None, None, None, None, None
+                is_empty = 0
+                stack.push(pc+2) # location to return to incase of a jump
+                stack.push(name)
+                stack.push(key)
+                if name == 'sales':
+                    stack.push(cache_state[name][key]['buyer'])
+                    stack.push(cache_state[name][key]['date']['unix']+cache_state[name][key]['date']['locale'])
+                    stack.push(cache_state[name][key]['section'])
+
+                    total_prev_values = 0
+                    if cache_state[name][key]['prev_values']:
+                        for in_key in cache_state[name][key]['prev_values']:
+                            total_prev_values += 1
+                            stack.push(cache_state[name][key]['prev_values'][in_key])
+                    
+                    stack.push(3+total_prev_values)
+                elif name == 'purchases':
+                    stack.push(cache_state[name][key]['item_name'])
+                    stack.push(cache_state[name][key]['date']['unix']+cache_state[name][key]['date']['locale'])
+                    stack.push(cache_state[name][key]['section'])
+
+                    total_prev_values = 0
+                    if cache_state[name][key]['prev_values']:
+                        for in_key in cache_state[name][key]['prev_values']:
+                            total_prev_values += 1
+                            stack.push(cache_state[name][key]['prev_values'][in_key])
+                    
+                    stack.push(3+total_prev_values)
+                elif name == 'dead_sick':
+                    stack.push(cache_state[name][key]['date']['unix']+cache_state[name][key]['date']['locale'])
+                    stack.push(cache_state[name][key]['section'])
+                    stack.push(cache_state[name][key]['location'])
+
+                    total_prev_values = 0
+                    if cache_state[name][key]['prev_values']:
+                        for in_key in cache_state[name][key]['prev_values']:
+                            total_prev_values += 1
+                            stack.push(cache_state[name][key]['prev_values'][in_key])
+                    
+                    stack.push(3+total_prev_values)
+                elif name == 'eggs_collected':
+                    stack.push(cache_state[name][key]['date']['unix']+cache_state[name][key]['date']['locale'])
+                    
+                    total_prev_values = 0
+                    if cache_state[name][key]['prev_values']:
+                        for in_key in cache_state[name][key]['prev_values']:
+                            total_prev_values += 1
+                            stack.push(cache_state[name][key]['prev_values'][in_key])
+                    
+                    stack.push(1+total_prev_values)
+                elif name == 'trades':
+                    stack.push(cache_state[name][key]['amount'])
+                    stack.push(cache_state[name][key]['from'])
+                    stack.push(cache_state[name][key]['to'])
+                    stack.push(cache_state[name][key]['sale_hash'])
+                    stack.push(cache_state[name][key]['purchase_hash'])
+                    # trades will always produce a unique hash since date == current timestamp
+                    stack.push(cache_state[name][key]['date']['unix']+cache_state[name][key]['date']['locale'])
+
+                    stack.push(5)
+                else:
+                    log.error("collection name invalid")
+                    return None, None, None, None, None
+        
+        if is_empty:
+            pc += 2
+        else:
+            pc += 1
+
+    instructions_executed[str(pc)] = PREPFINALISE
+    return stack, memory, pc, cache_state, cache_accounts
+
+
+inst_mapping = {
+    str(PUSH): push,
+    str(DUP): dup,
+    str(ADD): add,
+    str(MUL): mul,
+    str(SUB): sub,
+    str(DIV): div,
+    str(EQ): eq,
+    str(SWAP): swap,
+    str(ISZERO): is_zero,
+    str(STOP): stop,
+    str(TXHASH): tx_hash,
+    str(TXVALSHASH): tx_values_to_hash,
+    str(COLLHASH): collection_hashes_to_hash,
+    str(ROOTHASH): root_hash,
+    str(SHA512): sha512,
+    str(UPDATECACHE): update_cache,
+    str(STATE): get_state,
+    str(PREPFINALISE): prep_finalise_data,
+    str(CENTRY): create_entry,
+    str(CADDR): create_address,
+    str(DADDR): delete_address,
+    str(DENTRY): delete_entry,
+    str(NOW): timestamp_now
+}
 
 
 '''
@@ -757,125 +860,3 @@ STOP
 # get_tx(pops num of elements, decreases by 1, if 0, push end_inner_loop_signal else pushes back, pushes tx required data & num),
 # hash them, compare, if true, inner_loop check if done jump_to get_collection_name else jump_to next tx
 # followed by jumpif
-def prep_finalise_data(stack, pc=None, analysed=None):
-    # everytime create/delete doc is called, collection name is pushed to stack
-    # at this point, the stack should only have collection names
-    collection_names = set(stack.get_stack())
-    stack.clear_stack()
-    if not stack.is_stack_empty():
-        return None, None, None, None
-
-    last_jump = pc+2
-    jump_dest = pc+7
-    last_jump_2 = jump_dest
-    jump_dest_2 = last_jump_2+6
-    stack.push(0) # signal first loop is done
-    for name in collection_names:
-        stack.push(name)
-        i = 0
-        for key in cache_state[name]:
-            if key != 'state' and key != 'prev_states':
-                stack.push(cache_state[name][key]['tx_hash'])
-                i += 1
-
-        stack.push(i)
-    
-    stack.push(0) # Signals second loop is done
-
-    for name in collection_names:
-        hashes = ''
-        '''
-        sales: section, date = { unix, string }, buyer, tray_price, tray_no, tx_hash, by
-         submitted_on = { unix, string }, local_nonce, global_nonce
-        
-        purchases: tx_hash, item_name, item_no, item_price, date = { unix, string }, by, section,
-         submitted_on = { unix, string }, local_nonce, global_nonce
-        
-        dead_sick: tx_hash, number, date = { unix, string }, by, section, location, reason, image_id, image_url
-         submitted_on = { unix, string }, local_nonce, global_nonce
-        
-        eggs_collected: tx_hash, a1, a2, b1, b2, c1, c2, broken, house, date = { unix, string }, by, trays_collected
-         submitted_on = { unix, string }, local_nonce, global_nonce
-        
-        trades: tx_hash, from, to, date = { unix, string }, sale_hash, purchase_hash, by,
-         submitted_on = { unix, string }, local_nonce, global_nonce, amount
-
-        '''
-        is_empty = 1
-
-        for key in cache_state[name]:
-            if key != 'state' and key != 'prev_states':
-                # get all values in dict - hash
-                # hash them
-                # if hashed != tx_hash
-                # hashes in tx don't match
-                # return None, None, None, None
-                is_empty = 0
-                stack.push(pc+2) # location to return to incase of a jump
-                stack.push(name)
-                stack.push(key)
-                if name == 'sales':
-                    stack.push(cache_state[name][key]['buyer'])
-                    stack.push(cache_state[name][key]['date']['unix']+cache_state[name][key]['date']['locale'])
-                    stack.push(cache_state[name][key]['section'])
-                    stack.push(3)
-                elif name == 'purchases':
-                    stack.push(cache_state[name][key]['item_name'])
-                    stack.push(cache_state[name][key]['date']['unix']+cache_state[name][key]['date']['locale'])
-                    stack.push(cache_state[name][key]['section'])
-                    stack.push(3)
-                elif name == 'dead_sick':
-                    stack.push(cache_state[name][key]['date']['unix']+cache_state[name][key]['date']['locale'])
-                    stack.push(cache_state[name][key]['section'])
-                    stack.push(cache_state[name][key]['location'])
-                    stack.push(3)
-                elif name == 'eggs_collected':
-                    stack.push(cache_state[name][key]['date']['unix']+cache_state[name][key]['date']['locale'])
-                    stack.push(1)
-                elif name == 'trades':
-                    stack.push(cache_state[name][key]['amount'])
-                    stack.push(cache_state[name][key]['from'])
-                    stack.push(cache_state[name][key]['to'])
-                    stack.push(cache_state[name][key]['sale_hash'])
-                    #TODO make a check that sale hash and purchase hash both are never non-empty at the same time
-                    stack.push(cache_state[name][key]['purchase_hash'])
-                    stack.push(cache_state[name][key]['date']['unix']+cache_state[name][key]['date']['locale'])
-                    stack.push(5)
-                else:
-                    print("collection name invalid")
-                    return None, None, None, None
-        
-        if is_empty:
-            pc += 2
-        else:
-            pc += 1
-
-    instructions_executed[str(pc)] = PREPFINALISE
-    return stack, pc, cache_state, cache_accounts
-
-
-inst_mapping = {
-    str(PUSH): push,
-    str(DUP): dup,
-    str(ADD): add,
-    str(MUL): mul,
-    str(SUB): sub,
-    str(DIV): div,
-    str(EQ): eq,
-    str(SWAP): swap,
-    str(STOP): stop,
-    str(ROOTHASH): root_hash,
-    str(JUMPIF): jump_if,
-    str(SHA512): sha512,
-    str(ISZERO): is_zero,
-    str(CONFIRMCACHE): confirm_cache,
-    str(UPDATECACHE): update_cache,
-    str(STATE): get_state,
-    str(EXITLOOP): exit_loop,
-    str(PREPFINALISE): prep_finalise_data,
-    str(CENTRY): create_entry,
-    str(CADDR): create_address,
-    str(DADDR): delete_address,
-    str(DENTRY): delete_entry,
-    str(NOW): timestamp_now
-}
