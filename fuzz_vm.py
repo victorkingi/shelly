@@ -23,9 +23,6 @@ def TestVM(input_bytes):
   for x in rand_list:
     if input_list[x-1] == PUSH:
       input_list[x] = valid_strings[random.randint(0, len(valid_strings)-1)]
-  
-  if os.path.exists("vm.log"):
-    os.remove("vm.log")
 
   vm_ = VM(input_list)
   vm_.execute()

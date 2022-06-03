@@ -1,0 +1,13 @@
+calculate root hash:
+for each collection,
+get a tx,
+get all prev values of the tx add to array(includes submitted_on),
+get all current_values(each one including the tx hash and id), add to array,
+reduce array to hash,
+append hash to main collection array,
+on completion of a collection, compare value with root hash, exit if no match & no create/delete event happened
+else continue to next collection appending collection hash to all array,
+on complete, reduce main array to get global root hash and compare as well
+
+
+ 

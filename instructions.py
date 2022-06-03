@@ -332,7 +332,7 @@ def get_state(stack=None, memory=None, pc=None, analysed=None):
         log.error(f"state doc for {collection_name}, does not exist")
         return None, None, None, None, None
 
-    if not cache_state[collection_name]:
+    if not cache_state[collection_name]['state']['root_hash']:
         log.info("no state cache exists, adding...")
         cache_state[collection_name]['state'] = state_dict
 
@@ -369,7 +369,7 @@ def update_cache(stack=None, memory=None, pc=None, analysed=None):
         log.error(f"state doc for {collection_name}, does not exist")
         return None, None, None, None, None
     
-    if not cache_state[collection_name]:
+    if not cache_state[collection_name]['state']['root_hash']:
         # no cache exists, proceed with query
         log.info("no cache exists, querying...")
         query = collection_ref.order_by('submitted_on.unix', direction=firestore.Query.ASCENDING)
@@ -850,6 +850,190 @@ def prep_finalise_data(stack=None, memory=None, pc=None, analysed=None):
             pc += 1
 
     return stack, memory, pc, cache_state, cache_accounts
+
+
+
+# each week and month is represented by a timestamp
+# month is current_timestamp+30days, week is current_timestamp+7days
+def initialise():
+    print("initialising...")
+    all_collections = []
+    for name in cache_state:
+        all_collections.append(name)
+        collection_ref = db.collection(name)
+        state = cache_state[name]['state']
+
+        if name == 'eggs_collected':
+            state['total_eggs'] = 0
+            sections = ['a1','a2', 'b1', 'b2', 'c1', 'c2', 'broke', 'house']
+            for sec in sections:
+                state[f'total_eggs_{sec}'] = 0
+
+            state['trays_collected_to_timestamp'] = {'0': '0,0'}
+            state['diff_trays_to_exact'] = {'0': '0,0'} # 0 represents unix 0
+            state['week_trays_and_exact'] = {'0': {'trays_collected': '0,0', 'exact': '0,0'}} # 0 represents timestamp week 0
+            state['month_trays_and_exact'] = {'0': {'trays_collected': '0,0', 'exact': '0,0'}} # 0 represents month 0
+            state['change_week'] = {'0': {'change_trays_collected': 0, 'change_exact': 0 }} # 0 represents (week 0 - week 0), 1 will represent (week 1 - week 0)
+            state['change_month'] = {'0': {'change_trays_collected': 0, 'change_exact': 0 }} # 0 represents (month 0 - month 0), 1 will represent (month 1 - month 0)
+
+        elif name == 'sales':
+            state['total_sales'] = 0
+            state['total_earned'] = 0
+            state['total_trays_sold'] = 0
+            sections = ['thikafarmers', 'other', 'cakes', 'duka']
+            for sec in sections:
+                state[f'total_earned_{sec}'] = 0
+                state[f'total_trays_sold_{sec}'] = 0
+            # everytime there is a new buyer, we will add a new field total_earned_other_buyer_name
+
+            state['week_trays_sold_earned'] = {'0': {
+                'trays_sold': 0,
+                'earned': 0,
+                f'earned_{sections[0]}': 0,
+                f'earned_{sections[1]}': 0,
+                f'earned_{sections[2]}': 0,
+                f'earned_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                f'trays_sold_{sections[0]}': 0,
+                f'trays_sold_{sections[1]}': 0,
+                f'trays_sold_{sections[2]}': 0,
+                f'trays_sold_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                }
+            }
+            state['month_trays_sold_earned'] = {'0': {
+                'trays_sold': 0,
+                'earned': 0,
+                f'earned_{sections[0]}': 0,
+                f'earned_{sections[1]}': 0,
+                f'earned_{sections[2]}': 0,
+                f'earned_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                f'trays_sold_{sections[0]}': 0,
+                f'trays_sold_{sections[1]}': 0,
+                f'trays_sold_{sections[2]}': 0,
+                f'trays_sold_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                }
+            }
+            state['change_week'] = {'0': {
+                'change_trays_sold': 0,
+                'change_earned': 0,
+                f'change_earned_{sections[0]}': 0,
+                f'change_earned_{sections[1]}': 0,
+                f'change_earned_{sections[2]}': 0,
+                f'change_earned_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                f'change_trays_sold_{sections[0]}': 0,
+                f'change_trays_sold_{sections[1]}': 0,
+                f'change_trays_sold_{sections[2]}': 0,
+                f'change_trays_sold_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                }
+            }
+            state['change_month'] = {'0': {
+                'change_trays_sold': 0,
+                'change_earned': 0,
+                f'change_earned_{sections[0]}': 0,
+                f'change_earned_{sections[1]}': 0,
+                f'change_earned_{sections[2]}': 0,
+                f'change_earned_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                f'change_trays_sold_{sections[0]}': 0,
+                f'change_trays_sold_{sections[1]}': 0,
+                f'change_trays_sold_{sections[2]}': 0,
+                f'change_trays_sold_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                }
+            }
+
+        elif name == 'purchases':
+            state['total_purchases'] = 0
+            state['total_spent'] = 0
+            state['total_items_bought'] = 0
+            sections = ['feeds', 'drugs', 'other', 'purity']
+            for sec in sections:
+                state[f'total_spent_{sec}'] = 0
+            # everytime there is a new buyer, we will add a new field total_earned_other_buyer_name
+
+            state['week_items_bought_spent'] = {'0': {
+                'items_bought': 0,
+                'spent': 0,
+                f'spent_{sections[0]}': 0,
+                f'spent_{sections[1]}': 0,
+                f'spent_{sections[2]}': 0,
+                f'spent_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                f'items_bought_{sections[0]}': 0,
+                f'items_bought_{sections[1]}': 0,
+                f'items_bought_{sections[2]}': 0,
+                f'items_bought_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                }
+            }
+            state['month_items_bought_spent'] = {'0': {
+                'items_bought': 0,
+                'spent': 0,
+                f'spent_{sections[0]}': 0,
+                f'spent_{sections[1]}': 0,
+                f'spent_{sections[2]}': 0,
+                f'spent_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                f'items_bought_{sections[0]}': 0,
+                f'items_bought_{sections[1]}': 0,
+                f'items_bought_{sections[2]}': 0,
+                f'items_bought_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                }
+            }
+            state['change_week'] = {'0': {
+                'change_items_bought': 0,
+                'change_spent': 0,
+                f'change_spent_{sections[0]}': 0,
+                f'change_spent_{sections[1]}': 0,
+                f'change_spent_{sections[2]}': 0,
+                f'change_spent_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                f'change_items_bought_{sections[0]}': 0,
+                f'change_items_bought_{sections[1]}': 0,
+                f'change_items_bought_{sections[2]}': 0,
+                f'change_items_bought_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                }
+            }
+            state['change_month'] = {'0': {
+                'change_items_bought': 0,
+                'change_spent': 0,
+                f'change_spent_{sections[0]}': 0,
+                f'change_spent_{sections[1]}': 0,
+                f'change_spent_{sections[2]}': 0,
+                f'change_spent_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                f'change_items_bought_{sections[0]}': 0,
+                f'change_items_bought_{sections[1]}': 0,
+                f'change_items_bought_{sections[2]}': 0,
+                f'change_items_bought_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                }
+            }
+
+        elif name == 'dead_sick':
+            state['total_dead'] = 0
+        
+        elif name == 'trades':
+            state['balances'] = cache_accounts
+
+
+        collection_ref.document('state').set(state)
+        collection_ref.document('prev_states').set({'0': state })
+        print(name, "added state")
+    
+    global_state_ref = db.collection('world_state')
+    world_state = {
+        f'root_{all_collections[0]}': '',
+        f'root_{all_collections[1]}': '',
+        f'root_{all_collections[2]}': '',
+        f'root_{all_collections[3]}': '',
+        f'root_{all_collections[4]}': '',
+        'week_laying_percent': {'0': {}},
+        'month_laying_percent': {'0': {}},
+        'week_profit': {'0': 0 },
+        'month_profit': {'0': 0 },
+        'available_to_withdraw': {},  # users will be added here once trade state is updated with an account
+        'net_user_income': {'total': 0}, # this will never be final i.e. a change could happen in the state after a withdraw leading to negative amount
+        'age_of_birds': {'start_date': {'unix': 0, 'locale': ''}, 'age': {'unix': 0, 'years': 0, 'months': 0, 'weeks': 0 }}
+    }
+    sections = ['total', 'a1','a2', 'b1', 'b2', 'c1', 'c2', 'house']
+    for sec in sections:
+        world_state['week_laying_percent']['0'][f'{sec}'] = 0
+        world_state['month_laying_percent']['0'][f'{sec}'] = 0
+    
+    global_state_ref.document('main').set(world_state)
+    collection_ref.document('prev_states').set({'0': state })
 
 
 inst_mapping = {

@@ -24,7 +24,7 @@ if __name__ == '__main__':
             else:
                 compiler_.global_code.append([STOP])
                 flattened_code = [item for sublist in compiler_.global_code for item in sublist]
-                vm_ = VM()
+                vm_ = VM([26, 'sales', 23, 3])
                 res, state, acc = vm_.execute()
                 print("vm solution:", res, "other", result.value)
     
