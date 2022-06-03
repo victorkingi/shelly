@@ -2,7 +2,7 @@ import logging
 import os
 
 if os.path.exists("vm.log"):
-    #os.remove("vm.log")
+    os.remove("vm.log")
     print("cleaned log file")
 
 

@@ -6,7 +6,7 @@ import opcodes
 from log_ import log
 from stack import Stack
 from instructions import inst_mapping
-from constants import MULTIPLIER
+
 
 class VM:
     def __init__(self, code_=[]):

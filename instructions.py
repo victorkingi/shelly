@@ -148,26 +148,38 @@ def stop(stack=None, memory=None, pc=None, analysed=None):
     pc += 1
 
     if stack.size() == 1:
-        empty_state = {
+        empty_state = { 
             'sales': {
-                'state': {'root_hash': '', 'all_ids': {}},
-                'prev_3_states': {'0': {}, '1': {}, '2': {}}
+                'state': {
+                    'root_hash': '',
+                    'all_ids': {},
+                    'prev_3_states': {'0': {}, '1': {}, '2': {}}
+                }
             },
             'purchases': {
-                'state': {'root_hash': '', 'all_ids': {}},
-                'prev_3_states': {'0': {}, '1': {}, '2': {}}
+                'state': {
+                    'root_hash': '',
+                    'all_ids': {},
+                    'prev_3_states': {'0': {}, '1': {}, '2': {}}
+                }
             },
             'eggs_collected': {
                 'state': {'root_hash': '', 'all_ids': {}},
                 'prev_3_states': {'0': {}, '1': {}, '2': {}}
             },
             'dead_sick': {
-                'state': {'root_hash': '', 'all_ids': {}},
-                'prev_3_states': {'0': {}, '1': {}, '2': {}}
+                'state': {
+                    'root_hash': '',
+                    'all_ids': {},
+                    'prev_3_states': {'0': {}, '1': {}, '2': {}}
+                }
             },
             'trades': {
-                'state': {'root_hash': '', 'all_ids': {}},
-                'prev_3_states': {'0': {}, '1': {}, '2': {}}
+                'state': {
+                    'root_hash': '',
+                    'all_ids': {},
+                    'prev_3_states': {'0': {}, '1': {}, '2': {}}
+                }
             }
         }
         empty_accounts = {}
@@ -175,8 +187,9 @@ def stop(stack=None, memory=None, pc=None, analysed=None):
             # successful exit
             val = stack.pop()
             if not isinstance(val, Decimal):
-                log.error(f"invalid value popped from stack, got {type(val)} expected decimal, value: {val}")
-                return None, None, None, None, None
+                log.warning(f"Non Dec value popped from stack, got {type(val)} expected decimal, value: {val}")
+                stack.push(val)
+                return stack, memory, -1, cache_state, cache_accounts
             
             try:
                 val = val.quantize(TWOPLACES)
@@ -598,7 +611,7 @@ def create_entry(stack=None, memory=None, pc=None, analysed=None):
         for id in order:
             val = stack.pop()
             if id == 'submitted_on' or id == 'date':
-                dt1 = dt.datetime.fromtimestamp(val, tz=NBO)
+                dt1 = dt.fromtimestamp(val, tz=NBO)
                 locale = dt1.strftime("%m/%d/%Y, %H:%M:%S")
 
                 cache_state['sales']['temp'][id] = {'unix': val, 'locale': locale+', Africa/Nairobi'}
@@ -621,7 +634,7 @@ def create_entry(stack=None, memory=None, pc=None, analysed=None):
             val = stack.pop()
 
             if id == 'submitted_on' or id == 'date':
-                dt1 = dt.datetime.fromtimestamp(val, tz=NBO)
+                dt1 = dt.fromtimestamp(val, tz=NBO)
                 locale = dt1.strftime("%m/%d/%Y, %H:%M:%S")
 
                 cache_state['purchases']['temp'][id] = {'unix': val, 'locale': locale+', Africa/Nairobi'}
@@ -643,7 +656,7 @@ def create_entry(stack=None, memory=None, pc=None, analysed=None):
         for id in order:
             val = stack.pop()
             if id == 'submitted_on' or id == 'date':
-                dt1 = dt.datetime.fromtimestamp(val, tz=NBO)
+                dt1 = dt.fromtimestamp(val, tz=NBO)
                 locale = dt1.strftime("%m/%d/%Y, %H:%M:%S")
 
                 cache_state['dead_sick']['temp'][id] = {'unix': val, 'locale': locale+', Africa/Nairobi'}
@@ -664,7 +677,7 @@ def create_entry(stack=None, memory=None, pc=None, analysed=None):
         for id in order:
             val = stack.pop()
             if id == 'submitted_on' or id == 'date':
-                dt1 = dt.datetime.fromtimestamp(val, tz=NBO)
+                dt1 = dt.fromtimestamp(val, tz=NBO)
                 locale = dt1.strftime("%m/%d/%Y, %H:%M:%S")
 
                 cache_state['eggs_collected']['temp'][id] = {'unix': val, 'locale': locale+', Africa/Nairobi'}
@@ -686,7 +699,7 @@ def create_entry(stack=None, memory=None, pc=None, analysed=None):
             val = stack.pop()
 
             if id == 'submitted_on' or id == 'date':
-                dt1 = dt.datetime.fromtimestamp(val, tz=NBO)
+                dt1 = dt.fromtimestamp(val, tz=NBO)
                 locale = dt1.strftime("%m/%d/%Y, %H:%M:%S")
 
                 cache_state['trades']['temp'][id] = {'unix': val, 'locale': locale+', Africa/Nairobi'}
