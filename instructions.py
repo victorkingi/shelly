@@ -3,6 +3,9 @@ from functools import reduce
 from decimal import *
 from firebase_admin import credentials
 from firebase_admin import firestore
+from datetime import datetime as dt
+from dateutil import tz
+import time
 
 from opcodes import *
 from util import get_collection_hashes, get_tx_data_to_hash
@@ -21,6 +24,7 @@ db = firestore.client()
 
 CREATE = 'CREATE'
 DELETE = 'DELETE'
+NBO = tz.gettz('Africa/Nairobi')
 
 cache_state = { 
     'sales': {
@@ -538,7 +542,7 @@ def update_cache(stack=None, memory=None, pc=None, analysed=None):
                     return stack, memory, pc, cache_state, cache_accounts
 
 
-# TODO: replace 1634774400000.0 with time.time_ns()
+# TODO: replace 1634774400000.0 with time.time()
 def timestamp_now(stack=None, memory=None, pc=None, analysed=None):
     log.debug(f"{pc}: NOW")
     pc += 1
@@ -593,7 +597,14 @@ def create_entry(stack=None, memory=None, pc=None, analysed=None):
         tx_hash = ''
         for id in order:
             val = stack.pop()
-            cache_state['sales']['temp'][id] = val
+            if id == 'submitted_on' or id == 'date':
+                dt1 = dt.datetime.fromtimestamp(val, tz=NBO)
+                locale = dt1.strftime("%m/%d/%Y, %H:%M:%S")
+
+                cache_state['sales']['temp'][id] = {'unix': val, 'locale': locale+', Africa/Nairobi'}
+
+            else:
+                cache_state['sales']['temp'][id] = val
 
             if id == 'tx_hash':
                 tx_hash = val
@@ -609,7 +620,14 @@ def create_entry(stack=None, memory=None, pc=None, analysed=None):
         for id in order:
             val = stack.pop()
 
-            cache_state['purchases']['temp'][id] = val
+            if id == 'submitted_on' or id == 'date':
+                dt1 = dt.datetime.fromtimestamp(val, tz=NBO)
+                locale = dt1.strftime("%m/%d/%Y, %H:%M:%S")
+
+                cache_state['purchases']['temp'][id] = {'unix': val, 'locale': locale+', Africa/Nairobi'}
+                
+            else:
+                cache_state['purchases']['temp'][id] = val
 
             if id == 'tx_hash':
                 tx_hash = val
@@ -624,7 +642,14 @@ def create_entry(stack=None, memory=None, pc=None, analysed=None):
         tx_hash = ''
         for id in order:
             val = stack.pop()
-            cache_state['dead_sick']['temp'][id] = val
+            if id == 'submitted_on' or id == 'date':
+                dt1 = dt.datetime.fromtimestamp(val, tz=NBO)
+                locale = dt1.strftime("%m/%d/%Y, %H:%M:%S")
+
+                cache_state['dead_sick']['temp'][id] = {'unix': val, 'locale': locale+', Africa/Nairobi'}
+                
+            else:
+                cache_state['dead_sick']['temp'][id] = val
 
             if id == 'tx_hash':
                 tx_hash = val
@@ -638,7 +663,14 @@ def create_entry(stack=None, memory=None, pc=None, analysed=None):
         tx_hash = ''
         for id in order:
             val = stack.pop()
-            cache_state['eggs_collected']['temp'][id] = val
+            if id == 'submitted_on' or id == 'date':
+                dt1 = dt.datetime.fromtimestamp(val, tz=NBO)
+                locale = dt1.strftime("%m/%d/%Y, %H:%M:%S")
+
+                cache_state['eggs_collected']['temp'][id] = {'unix': val, 'locale': locale+', Africa/Nairobi'}
+                
+            else:
+                cache_state['eggs_collected']['temp'][id] = val
 
             if id == 'tx_hash':
                 tx_hash = val
@@ -652,7 +684,15 @@ def create_entry(stack=None, memory=None, pc=None, analysed=None):
         tx_hash = ''
         for id in order:
             val = stack.pop()
-            cache_state['trades']['temp'][id] = val
+
+            if id == 'submitted_on' or id == 'date':
+                dt1 = dt.datetime.fromtimestamp(val, tz=NBO)
+                locale = dt1.strftime("%m/%d/%Y, %H:%M:%S")
+
+                cache_state['trades']['temp'][id] = {'unix': val, 'locale': locale+', Africa/Nairobi'}
+                
+            else:
+                cache_state['trades']['temp'][id] = val
 
             if id == 'tx_hash':
                 tx_hash = val
