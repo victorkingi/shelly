@@ -1,14 +1,15 @@
 # UTILITIES
 
 import hashlib
+from log_ import log
 
 def get_collection_hashes(collection_name, cache_state):
     hashes = []
     for key in cache_state[collection_name]:
         if key != 'state':
-            hashes.append(cache_state[collection_name][key]['tx_hash'])
+            if 'tx_hash' in cache_state[collection_name][key]:
+                hashes.append(cache_state[collection_name][key]['tx_hash'])
     
-    print("all hashes:", hashes)
     return hashes
 
 
@@ -16,31 +17,32 @@ def get_tx_data_to_hash(name, cache_state, tx_hash_):
     data = []
     for key in cache_state[name]:
         if key != 'state':
-            if cache_state[name][key]['tx_hash'] == tx_hash_:
-                if name == 'sales':
-                    data.append(cache_state[name][key]['buyer'])
-                    data.append(cache_state[name][key]['date']['unix']+cache_state[name][key]['date']['locale'])
-                    data.append(cache_state[name][key]['section'])
-                elif name == 'purchases':
-                    data.append(cache_state[name][key]['item_name'])
-                    data.append(cache_state[name][key]['date']['unix']+cache_state[name][key]['date']['locale'])
-                    data.append(cache_state[name][key]['section'])
-                elif name == 'dead_sick':
-                    data.append(cache_state[name][key]['date']['unix']+cache_state[name][key]['date']['locale'])
-                    data.append(cache_state[name][key]['section'])
-                    data.append(cache_state[name][key]['location'])
-                elif name == 'eggs_collected':
-                    data.append(cache_state[name][key]['date']['unix']+cache_state[name][key]['date']['locale'])
-                elif name == 'trades':
-                    data.append(cache_state[name][key]['amount'])
-                    data.append(cache_state[name][key]['from'])
-                    data.append(cache_state[name][key]['to'])
-                    data.append(cache_state[name][key]['sale_hash'])
-                    data.append(cache_state[name][key]['purchase_hash'])
-                    data.append(cache_state[name][key]['date']['unix']+cache_state[name][key]['date']['locale'])
-    
-    print("all hashes:", hashes)
-    return hashes
+            if 'tx_hash' in cache_state[name][key]:
+                if cache_state[name][key]['tx_hash'] == tx_hash_:
+                    log.debug(f"tx data found, collection: {name}, id: {key}, tx_hash: {tx_hash_}, {cache_state[name][key]}")
+                    if name == 'sales':
+                        data.append(cache_state[name][key]['buyer'])
+                        data.append(cache_state[name][key]['date']['unix']+cache_state[name][key]['date']['locale'])
+                        data.append(cache_state[name][key]['section'])
+                    elif name == 'purchases':
+                        data.append(cache_state[name][key]['item_name'])
+                        data.append(cache_state[name][key]['date']['unix']+cache_state[name][key]['date']['locale'])
+                        data.append(cache_state[name][key]['section'])
+                    elif name == 'dead_sick':
+                        data.append(cache_state[name][key]['date']['unix']+cache_state[name][key]['date']['locale'])
+                        data.append(cache_state[name][key]['section'])
+                        data.append(cache_state[name][key]['location'])
+                    elif name == 'eggs_collected':
+                        data.append(cache_state[name][key]['date']['unix']+cache_state[name][key]['date']['locale'])
+                    elif name == 'trades':
+                        data.append(cache_state[name][key]['amount'])
+                        data.append(cache_state[name][key]['from'])
+                        data.append(cache_state[name][key]['to'])
+                        data.append(cache_state[name][key]['sale_hash'])
+                        data.append(cache_state[name][key]['purchase_hash'])
+                        data.append(cache_state[name][key]['date']['unix']+cache_state[name][key]['date']['locale'])
+        
+    return data
 
 
 def string_with_arrows(text, pos_start, pos_end):

@@ -5,7 +5,7 @@ from firebase_admin import credentials
 from firebase_admin import firestore
 
 from opcodes import *
-from util import get_collection_hashes
+from util import get_collection_hashes, get_tx_data_to_hash
 from log_ import log
 
 import time
@@ -23,23 +23,50 @@ CREATE = 'CREATE'
 DELETE = 'DELETE'
 
 cache_state = { 
-    'sales': {},
-    'purchases': {},
-    'eggs_collected': {},
-    'dead_sick': {},
-    'trades': {}
+    'sales': {
+        'state': {
+            'root_hash': '',
+            'all_ids': {},
+            'prev_3_states': {'0': {}, '1': {}, '2': {}}
+        }
+    },
+    'purchases': {
+        'state': {
+            'root_hash': '',
+            'all_ids': {},
+            'prev_3_states': {'0': {}, '1': {}, '2': {}}
+        }
+    },
+    'eggs_collected': {
+        'state': {'root_hash': '', 'all_ids': {}},
+        'prev_3_states': {'0': {}, '1': {}, '2': {}}
+    },
+    'dead_sick': {
+        'state': {
+            'root_hash': '',
+            'all_ids': {},
+            'prev_3_states': {'0': {}, '1': {}, '2': {}}
+        }
+    },
+    'trades': {
+        'state': {
+            'root_hash': '',
+            'all_ids': {},
+            'prev_3_states': {'0': {}, '1': {}, '2': {}}
+        }
+    }
 }
 cache_accounts = {}
-instructions_executed = {}
-new_entry_counter = -1              # keeps track of how many new entries we have
 
 
 def push(elem=None, stack=None, memory=None, pc=None, analysed=None):
+    prev_type = type(elem)
+    log.debug(f"{pc}: PUSH {elem}, {type(elem)}")
     pc += 2
-    instructions_executed[str(pc)] = PUSH
 
     if isinstance(elem, float) or isinstance(elem, int):
         elem = Decimal(elem)
+        log.debug(f"converted from {prev_type} to {type(elem)}")
 
     if isinstance(elem, Decimal) or isinstance(elem, str):
         stack.push(elem)
@@ -50,8 +77,8 @@ def push(elem=None, stack=None, memory=None, pc=None, analysed=None):
 
 
 def add(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: ADD")
     pc += 1
-    instructions_executed[str(pc)] = ADD
 
     a = stack.pop()
     b = stack.pop()
@@ -61,8 +88,8 @@ def add(stack=None, memory=None, pc=None, analysed=None):
 
 
 def sub(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: SUB")
     pc += 1
-    instructions_executed[str(pc)] = SUB
 
     a = stack.pop()
     b = stack.pop()
@@ -71,8 +98,8 @@ def sub(stack=None, memory=None, pc=None, analysed=None):
 
 
 def mul(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: MUL")
     pc += 1
-    instructions_executed[str(pc)] = MUL
 
     a = stack.pop()
     b = stack.pop()
@@ -81,19 +108,23 @@ def mul(stack=None, memory=None, pc=None, analysed=None):
 
 
 def div(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: DIV")
     pc += 1
-    instructions_executed[str(pc)] = DIV
 
     a = stack.pop()
     b = stack.pop()
+    if not a:
+        # division by zero
+        log.error("Division by zero")
+        return None, None, None, None, None
     stack.push(b / a)
     
     return stack, memory, pc, cache_state, cache_accounts
 
 
 def dup(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: DUP")
     pc += 1
-    instructions_executed[str(pc)] = DUP
 
     num = stack.pop()
     arr = []
@@ -109,21 +140,40 @@ def dup(stack=None, memory=None, pc=None, analysed=None):
 
 
 def stop(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: STOP")
     pc += 1
-    instructions_executed[str(pc)] = STOP
 
     if stack.size() == 1:
-        empty_state = { 
-            'sales': {},
-            'purchases': {},
-            'eggs_collected': {},
-            'dead_sick': {},
-            'trades': {}
+        empty_state = {
+            'sales': {
+                'state': {'root_hash': '', 'all_ids': {}},
+                'prev_3_states': {'0': {}, '1': {}, '2': {}}
+            },
+            'purchases': {
+                'state': {'root_hash': '', 'all_ids': {}},
+                'prev_3_states': {'0': {}, '1': {}, '2': {}}
+            },
+            'eggs_collected': {
+                'state': {'root_hash': '', 'all_ids': {}},
+                'prev_3_states': {'0': {}, '1': {}, '2': {}}
+            },
+            'dead_sick': {
+                'state': {'root_hash': '', 'all_ids': {}},
+                'prev_3_states': {'0': {}, '1': {}, '2': {}}
+            },
+            'trades': {
+                'state': {'root_hash': '', 'all_ids': {}},
+                'prev_3_states': {'0': {}, '1': {}, '2': {}}
+            }
         }
         empty_accounts = {}
         if empty_accounts == cache_accounts and empty_state == cache_state:
             # successful exit
             val = stack.pop()
+            if not isinstance(val, Decimal):
+                log.error(f"invalid value popped from stack, got {type(val)} expected decimal, value: {val}")
+                return None, None, None, None, None
+            
             try:
                 val = val.quantize(TWOPLACES)
             except InvalidOperation:
@@ -148,18 +198,24 @@ def stop(stack=None, memory=None, pc=None, analysed=None):
 
 # pushes root hash of a collection to stack
 def root_hash(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: ROOTHASH")
     pc += 1
-    instructions_executed[str(pc)] = ROOTHASH
 
     collection_name = stack.pop()
 
-    stack.push(cache_state[collection_name]['state']['root_hash'])
-    return stack, memory, pc, cache_state, cache_accounts
+    if collection_name in cache_state:
+        if 'state' in cache_state[collection_name]:
+            if 'root_hash' in cache_state[collection_name]['state']:
+                stack.push(cache_state[collection_name]['state']['root_hash'])
+                return stack, memory, pc, cache_state, cache_accounts
+    
+    log.error(f"collection name {collection_name} does not exist or state and root hash do not exist")
+    return None, None, None, None, None
 
 
 def sha512(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: SHA512")
     pc += 1
-    instructions_executed[str(pc)] = SHA512
 
     m = hashlib.sha512()
     num_of_elements = stack.pop()
@@ -178,20 +234,25 @@ def sha512(stack=None, memory=None, pc=None, analysed=None):
 
 # pushes tx hash to stack given collection and id
 def tx_hash(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: TXHASH")
     pc += 1
-    instructions_executed[str(pc)] = TXHASH
 
     id = stack.pop()
     collection_name = stack.pop()
 
-    stack.push(cache_state[collection_name][id]['tx_hash'])
+    if collection_name in cache_state:
+        if id in cache_state[collection_name]:
+            stack.push(cache_state[collection_name][id]['tx_hash'])
+            return stack, memory, pc, cache_state, cache_accounts
+    
 
-    return stack, memory, pc, cache_state, cache_accounts
+    log.error(f"collection name {collection_name} or id {id} does not exist")
+    return None, None, None, None, None
 
 
 def is_zero(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: ISZERO")
     pc += 1
-    instructions_executed[str(pc)] = ISZERO
 
     val = stack.pop()
 
@@ -201,8 +262,8 @@ def is_zero(stack=None, memory=None, pc=None, analysed=None):
 
 
 def eq(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: EQ")
     pc += 1
-    instructions_executed[str(pc)] = EQ
 
     a = stack.pop()
     b = stack.pop()
@@ -213,10 +274,13 @@ def eq(stack=None, memory=None, pc=None, analysed=None):
 
 # followed by sha512
 def collection_hashes_to_hash(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: COLLHASH")
     pc += 1
-    instructions_executed[str(pc)] = COLLHASH
 
     collection_name = stack.pop()
+    if not collection_name in cache_state:
+        log.error(f"collection name {collection_name} does not exist")
+        return None, None, None, None, None
 
     cache_hashes = get_collection_hashes(collection_name, cache_state)
     cache_hashes.reverse()
@@ -228,12 +292,17 @@ def collection_hashes_to_hash(stack=None, memory=None, pc=None, analysed=None):
 
 # followed by sha512
 def tx_values_to_hash(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: TXVALSHASH")
+    log.debug(f"cache state: {cache_state}")
     pc += 1
-    instructions_executed[str(pc)] = TXVALSHASH
 
     tx_hash_ = stack.pop()
     collection_name = stack.pop()
 
+    if not collection_name in cache_state:
+        log.error(f"collection name {collection_name} does not exist")
+        return None, None, None, None, None
+    
     values_to_hash = get_tx_data_to_hash(name=collection_name, cache_state=cache_state, tx_hash_=tx_hash_)
     values_to_hash.reverse()
 
@@ -244,12 +313,20 @@ def tx_values_to_hash(stack=None, memory=None, pc=None, analysed=None):
 
 
 def get_state(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: UPDATESTATE")
     pc += 1
-    instructions_executed[str(pc)] = UPDATESTATE
 
     collection_name = stack.pop()
+    if not collection_name in cache_state:
+        log.error(f"collection name {collection_name} does not exist")
+        return None, None, None, None, None
+    
     collection_ref = db.collection(collection_name)
     state_dict = collection_ref.document('state').get().to_dict()
+
+    if state_dict is None:
+        log.error(f"state doc for {collection_name}, does not exist")
+        return None, None, None, None, None
 
     if not cache_state[collection_name]:
         log.info("no state cache exists, adding...")
@@ -272,18 +349,26 @@ def get_state(stack=None, memory=None, pc=None, analysed=None):
 # checking if a document exists require just the state document
 # followed by a jumpif
 def update_cache(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: UPDATECACHE")
     pc += 1
-    instructions_executed[str(pc)] = UPDATECACHE
 
     collection_name = stack.pop()
 
+    if not collection_name in cache_state:
+        log.error(f"collection name {collection_name}, does not exist")
+        return None, None, None, None, None
+    
     collection_ref = db.collection(collection_name)
     state_dict = collection_ref.document('state').get().to_dict()
+
+    if state_dict is None:
+        log.error(f"state doc for {collection_name}, does not exist")
+        return None, None, None, None, None
     
     if not cache_state[collection_name]:
         # no cache exists, proceed with query
         log.info("no cache exists, querying...")
-        query = collection_ref.order_by('submitted_on', direction=firestore.Query.ASCENDING)
+        query = collection_ref.order_by('submitted_on.unix', direction=firestore.Query.ASCENDING)
         results = query.stream()
         cache_state[collection_name]['state'] = state_dict
         for doc in results:
@@ -338,7 +423,7 @@ def update_cache(stack=None, memory=None, pc=None, analysed=None):
 
                 if operation_done == CREATE:
                     cache_state[collection_name]['temp_'+second['id']] =  {
-                        'tx_hash': oldest['tx_hash'],
+                        'tx_hash': second['tx_hash'],
                         'submitted_on': second['submitted_on']
                     }
 
@@ -359,7 +444,7 @@ def update_cache(stack=None, memory=None, pc=None, analysed=None):
 
                 if operation_done == CREATE:
                     cache_state[collection_name]['temp_'+newest['id']] =  {
-                        'tx_hash': oldest['tx_hash'],
+                        'tx_hash': newest['tx_hash'],
                         'submitted_on': newest['submitted_on']
                     }
                     local_newest = newest
@@ -376,7 +461,9 @@ def update_cache(stack=None, memory=None, pc=None, analysed=None):
 
             if update_attempted:
                 # since we inserted new elements, sort the dict so as to calculate correct hash
-                sorted_tuples = sorted(cache_state[collection_name].items(), key=lambda item: item[1].get('submitted_on', 0))
+                log.debug(f"cache after prev_state update but before sort: {cache_state}")
+                sorted_tuples = sorted(cache_state[collection_name].items(), key=lambda item: item[1]['submitted_on']['unix'] if 'submitted_on' in item[1] and 'unix' in item[1]['submitted_on'] else Decimal(0))
+                log.debug(f"cache after prev_state update after sort: {sorted_tuples}")
                 cache_state[collection_name] = {k: v for k, v in sorted_tuples}
 
                 # push all hashes to stack
@@ -411,7 +498,6 @@ def update_cache(stack=None, memory=None, pc=None, analysed=None):
                 if len(to_create) != 0:
                     for val in to_create:
                         cache_state[collection_name][val] = {
-                            'tx_hash': state_dict['all_ids'][val]['tx_hash'],
                             'submitted_on': state_dict['all_ids'][val]['submitted_on']
                         }
                         update_attempted = 1
@@ -454,16 +540,16 @@ def update_cache(stack=None, memory=None, pc=None, analysed=None):
 
 # TODO: replace 1634774400000.0 with time.time_ns()
 def timestamp_now(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: NOW")
     pc += 1
-    instructions_executed[str(pc)] = NOW
 
     stack.push(Decimal('1.6530634936213117e+18'))
     return stack, memory, pc, cache_state, cache_accounts
 
 
 def swap(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: SWAP")
     pc += 1
-    instructions_executed[str(pc)] = SWAP
 
     a = stack.pop()
     b = stack.pop()
@@ -473,8 +559,8 @@ def swap(stack=None, memory=None, pc=None, analysed=None):
 
 
 def create_address(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: CADDR")
     pc += 1
-    instructions_executed[str(pc)] = CADDR
 
     address_name = stack.pop()
     amount = stack.pop()
@@ -483,81 +569,125 @@ def create_address(stack=None, memory=None, pc=None, analysed=None):
 
 
 def delete_address(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: DADDR")
     pc += 1
-    instructions_executed[str(pc)] = DADDR
 
     address_name = stack.pop()
-    del cache_accounts[address_name]
-    return stack, memory, pc, cache_state, cache_accounts
+    if address_name in cache_accounts:
+        del cache_accounts[address_name]
+        return stack, memory, pc, cache_state, cache_accounts
+    else:
+        log.error("Address does not exist")
+        return None, None, None, None, None
 
 
 def create_entry(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: CENTRY")
     pc += 1
-    instructions_executed[str(pc)] = CENTRY
 
     entry_name = stack.pop()
-    new_entry_counter += 1
 
     if entry_name == 'SELL':
-        cache_state['sales'][f'new{new_entry_counter}'] = {}
+        cache_state['sales']['temp'] = {}
         order = [ 'submitted_on', 'by', 'tx_hash', 'tray_no', 'tray_price', 'buyer', 'date', 'section' ]
+        tx_hash = ''
         for id in order:
             val = stack.pop()
-            cache_state['sales'][f'new{new_entry_counter}'][id] = val
+            cache_state['sales']['temp'][id] = val
 
+            if id == 'tx_hash':
+                tx_hash = val
+
+        cache_state['sales'][f'new_{tx_hash}'] = cache_state['sales']['temp']
+        del cache_state['sales']['temp']
+        
 
     elif entry_name == 'BUY':
-        cache_state['purchases'][f'new{new_entry_counter}'] = {}
+        cache_state['purchases']['temp'] = {}
         order = [ 'submitted_on', 'by', 'tx_hash', 'item_no', 'item_price', 'item_name', 'date', 'section' ]
+        tx_hash = ''
         for id in order:
             val = stack.pop()
-            cache_state['purchases'][f'new{new_entry_counter}'][id] = val
+
+            cache_state['purchases']['temp'][id] = val
+
+            if id == 'tx_hash':
+                tx_hash = val
+
+        cache_state['purchases'][f'new_{tx_hash}'] = cache_state['purchases']['temp']
+        del cache_state['purchases']['temp']
     
 
     elif entry_name == 'DS':
-        cache_state['dead_sick'][f'new{new_entry_counter}'] = {}
+        cache_state['dead_sick']['temp'] = {}
         order = [ 'submitted_on', 'by', 'image_url', 'image_id', 'reason', 'tx_hash', 'number', 'date', 'section', 'location']
+        tx_hash = ''
         for id in order:
             val = stack.pop()
-            cache_state['dead_sick'][f'new{new_entry_counter}'][id] = val
+            cache_state['dead_sick']['temp'][id] = val
 
-        
+            if id == 'tx_hash':
+                tx_hash = val
+            
+        cache_state['dead_sick'][f'new_{tx_hash}'] = cache_state['dead_sick']['temp']
+        del cache_state['dead_sick']['temp']
+
     elif entry_name == 'EGGS':
-        cache_state['eggs_collected'][f'new{new_entry_counter}'] = {}
-        order = [ 'submitted_on', 'by', 'tx_hash', 'tray_no', 'tray_price', 'buyer', 'date', 'section' ]
+        cache_state['eggs_collected']['temp'] = {}
+        order = [ 'submitted_on', 'by', 'tx_hash', 'a1', 'a2', 'b1', 'b2', 'c1', 'c2', 'broken', 'house', 'date', 'trays_collected']
+        tx_hash = ''
         for id in order:
             val = stack.pop()
-            cache_state['eggs_collected'][f'new{new_entry_counter}'][id] = val
+            cache_state['eggs_collected']['temp'][id] = val
+
+            if id == 'tx_hash':
+                tx_hash = val
         
-        log.debug(f'{cache_state}')
+        cache_state['eggs_collected'][f'new_{tx_hash}'] = cache_state['eggs_collected']['temp']
+        del cache_state['eggs_collected']['temp']
 
     elif entry_name == 'TRADE':
-        cache_state['trades'][f'new{new_entry_counter}'] = {}
-        order = [ 'submitted_on', 'by', 'tx_hash', 'tray_no', 'tray_price', 'buyer', 'date', 'section' ]
+        cache_state['trades']['temp'] = {}
+        order = [ 'submitted_on', 'by', 'tx_hash', 'from', 'to', 'purchase_hash', 'sale_hash', 'amount', 'date']
+        tx_hash = ''
         for id in order:
             val = stack.pop()
-            cache_state['trades'][f'new{new_entry_counter}'][id] = val
+            cache_state['trades']['temp'][id] = val
+
+            if id == 'tx_hash':
+                tx_hash = val
+        
+        cache_state['trades'][f'new_{tx_hash}'] = cache_state['trades']['temp']
+        del cache_state['trades']['temp']
     
     else:
         log.error("Invalid entry")
         return None, None, None, None, None
     
+    log.debug(f'Entry added: {cache_state}')
+    
     return stack, memory, pc, cache_state, cache_accounts
 
 
 def delete_entry(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: DENTRY")
     pc += 1
-    instructions_executed[str(pc)] = DENTRY
 
     entry_id = stack.pop()
     collection_name = stack.pop()
 
-    del cache_state[collection_name][entry_id]
-
-    return stack, memory, pc, cache_state, cache_accounts
+    if collection_name in cache_state:
+        if entry_id in cache_state[collection_name]:
+            del cache_state[collection_name][entry_id]
+            return stack, memory, pc, cache_state, cache_accounts
+    
+    log.error(f"collection name: {collection_name} or entry id: {entry_id} does not exist")
+    return None, None, None, None, None
 
 
 def prep_finalise_data(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: PREPFINALISE")
+
     # everytime create/delete doc is called, collection name is pushed to stack
     # at this point, the stack should only have collection names
     collection_names = set(stack.get_stack())
@@ -679,7 +809,6 @@ def prep_finalise_data(stack=None, memory=None, pc=None, analysed=None):
         else:
             pc += 1
 
-    instructions_executed[str(pc)] = PREPFINALISE
     return stack, memory, pc, cache_state, cache_accounts
 
 

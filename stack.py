@@ -19,6 +19,7 @@ class Stack:
 
     def peek(self): return self.stack[-1]
     def peek2(self): return self.stack[-2]
+    def peek_n(self, n): return self.stack[(-1*n):]
     def bottom(self): return self.stack[0]
     def is_stack_empty(self):
         if len(self.stack)>=1:
