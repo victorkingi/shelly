@@ -6,10 +6,12 @@ from firebase_admin import firestore
 from datetime import datetime as dt
 from dateutil import tz
 import time
+import sys
 
 from opcodes import *
-from util import get_collection_hashes, get_tx_data_to_hash
+from util import *
 from log_ import log
+from constants import *
 
 import time
 import hashlib
@@ -22,45 +24,112 @@ cred = credentials.Certificate("core101-3afde-firebase-adminsdk-sxm20-194a475b51
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
-CREATE = 'CREATE'
-DELETE = 'DELETE'
 NBO = tz.gettz('Africa/Nairobi')
 
 cache_state = { 
     'sales': {
         'state': {
             'root_hash': '',
-            'all_ids': {},
-            'prev_3_states': {'0': {}, '1': {}, '2': {}}
-        }
+            'all_tx_hashes': {},
+            'prev_3_states': {'0': {
+                'op': '',
+                'tx_hash': '',
+                'submitted_on': {'unix': 0, 'locale': ''}
+            }, '1': {
+                'op': '',
+                'tx_hash': '',
+                'submitted_on': {'unix': 0, 'locale': ''}
+            }, '2': {
+                'op': '',
+                'tx_hash': '',
+                'submitted_on': {'unix': 0, 'locale': ''}
+            }}
+        },
+        'prev_states': {}
     },
     'purchases': {
         'state': {
             'root_hash': '',
-            'all_ids': {},
-            'prev_3_states': {'0': {}, '1': {}, '2': {}}
-        }
+            'all_tx_hashes': {},
+            'prev_3_states': {'0': {
+                'op': '',
+                'tx_hash': '',
+                'submitted_on': {'unix': 0, 'locale': ''}
+            }, '1': {
+                'op': '',
+                'tx_hash': '',
+                'submitted_on': {'unix': 0, 'locale': ''}
+            }, '2': {
+                'op': '',
+                'tx_hash': '',
+                'submitted_on': {'unix': 0, 'locale': ''}
+            }}
+        },
+        'prev_states': {}
     },
     'eggs_collected': {
-        'state': {'root_hash': '', 'all_ids': {}},
-        'prev_3_states': {'0': {}, '1': {}, '2': {}}
-    },
-    'dead_sick': {
         'state': {
             'root_hash': '',
-            'all_ids': {},
-            'prev_3_states': {'0': {}, '1': {}, '2': {}}
-        }
+            'all_tx_hashes': {},
+            'prev_3_states': {'0': {
+                'op': '',
+                'tx_hash': '',
+                'submitted_on': {'unix': 0, 'locale': ''}
+            }, '1': {
+                'op': '',
+                'tx_hash': '',
+                'submitted_on': {'unix': 0, 'locale': ''}
+            }, '2': {
+                'op': '',
+                'tx_hash': '',
+                'submitted_on': {'unix': 0, 'locale': ''}
+            }}
+        },
+        'prev_states': {}
+    },
+    'dead_sick': {
+       'state': {
+            'root_hash': '',
+            'all_tx_hashes': {},
+            'prev_3_states': {'0': {
+                'op': '',
+                'tx_hash': '',
+                'submitted_on': {'unix': 0, 'locale': ''}
+            }, '1': {
+                'op': '',
+                'tx_hash': '',
+                'submitted_on': {'unix': 0, 'locale': ''}
+            }, '2': {
+                'op': '',
+                'tx_hash': '',
+                'submitted_on': {'unix': 0, 'locale': ''}
+            }}
+        },
+        'prev_states': {}
     },
     'trades': {
         'state': {
             'root_hash': '',
-            'all_ids': {},
-            'prev_3_states': {'0': {}, '1': {}, '2': {}}
-        }
+            'all_tx_hashes': {},
+            'prev_3_states': {'0': {
+                'op': '',
+                'tx_hash': '',
+                'submitted_on': {'unix': 0, 'locale': ''}
+            }, '1': {
+                'op': '',
+                'tx_hash': '',
+                'submitted_on': {'unix': 0, 'locale': ''}
+            }, '2': {
+                'op': '',
+                'tx_hash': '',
+                'submitted_on': {'unix': 0, 'locale': ''}
+            }}
+        },
+        'prev_states': {}
     }
 }
-cache_accounts = {}
+cache_accounts = {'BLACK_HOLE': sys.maxsize }
+cache_deleted = {} # no need to keep track of this as entries are only dumped into it
 
 
 def push(elem=None, stack=None, memory=None, pc=None, analysed=None):
@@ -152,34 +221,42 @@ def stop(stack=None, memory=None, pc=None, analysed=None):
             'sales': {
                 'state': {
                     'root_hash': '',
-                    'all_ids': {},
+                    'all_tx_hashes': {},
                     'prev_3_states': {'0': {}, '1': {}, '2': {}}
-                }
+                },
+                'prev_states': {}
             },
             'purchases': {
                 'state': {
                     'root_hash': '',
-                    'all_ids': {},
+                    'all_tx_hashes': {},
                     'prev_3_states': {'0': {}, '1': {}, '2': {}}
-                }
+                },
+                'prev_states': {}
             },
             'eggs_collected': {
-                'state': {'root_hash': '', 'all_ids': {}},
-                'prev_3_states': {'0': {}, '1': {}, '2': {}}
-            },
-            'dead_sick': {
                 'state': {
                     'root_hash': '',
-                    'all_ids': {},
+                    'all_tx_hashes': {},
                     'prev_3_states': {'0': {}, '1': {}, '2': {}}
-                }
+                },
+                'prev_states': {}
+            },
+            'dead_sick': {
+            'state': {
+                    'root_hash': '',
+                    'all_tx_hashes': {},
+                    'prev_3_states': {'0': {}, '1': {}, '2': {}}
+                },
+                'prev_states': {}
             },
             'trades': {
                 'state': {
                     'root_hash': '',
-                    'all_ids': {},
+                    'all_tx_hashes': {},
                     'prev_3_states': {'0': {}, '1': {}, '2': {}}
-                }
+                },
+                'prev_states': {}
             }
         }
         empty_accounts = {}
@@ -230,11 +307,11 @@ def root_hash(stack=None, memory=None, pc=None, analysed=None):
     return None, None, None, None, None
 
 
-def sha512(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: SHA512")
+def sha256(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: sha256")
     pc += 1
 
-    m = hashlib.sha512()
+    m = hashlib.sha256()
     num_of_elements = stack.pop()
     to_hash = ''
 
@@ -247,24 +324,6 @@ def sha512(stack=None, memory=None, pc=None, analysed=None):
     stack.push(m.hexdigest())
 
     return stack, memory, pc, cache_state, cache_accounts
-
-
-# pushes tx hash to stack given collection and id
-def tx_hash(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: TXHASH")
-    pc += 1
-
-    id = stack.pop()
-    collection_name = stack.pop()
-
-    if collection_name in cache_state:
-        if id in cache_state[collection_name]:
-            stack.push(cache_state[collection_name][id]['tx_hash'])
-            return stack, memory, pc, cache_state, cache_accounts
-    
-
-    log.error(f"collection name {collection_name} or id {id} does not exist")
-    return None, None, None, None, None
 
 
 def is_zero(stack=None, memory=None, pc=None, analysed=None):
@@ -289,7 +348,7 @@ def eq(stack=None, memory=None, pc=None, analysed=None):
     return stack, memory, pc, cache_state, cache_accounts
 
 
-# followed by sha512
+# followed by sha256
 def collection_hashes_to_hash(stack=None, memory=None, pc=None, analysed=None):
     log.debug(f"{pc}: COLLHASH")
     pc += 1
@@ -307,7 +366,7 @@ def collection_hashes_to_hash(stack=None, memory=None, pc=None, analysed=None):
     return stack, memory, pc, cache_state, cache_accounts
 
 
-# followed by sha512
+# followed by sha256
 def tx_values_to_hash(stack=None, memory=None, pc=None, analysed=None):
     log.debug(f"{pc}: TXVALSHASH")
     log.debug(f"cache state: {cache_state}")
@@ -419,18 +478,17 @@ def update_cache(stack=None, memory=None, pc=None, analysed=None):
                 operation_done = oldest['op'] # can be delete or create
 
                 if operation_done == CREATE:
-                    cache_state[collection_name]['temp_'+oldest['id']] = {
-                        'tx_hash': oldest['tx_hash'],
+                    cache_state[collection_name]['temp_'+oldest['tx_hash']] = {
                         'submitted_on': oldest['submitted_on']
                     }
 
                     local_oldest = oldest
                     update_attempted = 1                    
                 elif operation_done == DELETE:
-                    if cache_state[collection_name].get('temp_'+oldest['id'], False):
-                        del cache_state[collection_name]['temp_'+oldest['id']]
+                    if cache_state[collection_name].get('temp_'+oldest['tx_hash'], False):
+                        del cache_state[collection_name]['temp_'+oldest['tx_hash']]
                     else:
-                        del cache_state[collection_name][oldest['id']]
+                        del cache_state[collection_name][oldest['tx_hash']]
 
                     local_oldest = oldest
                     update_attempted = 1
@@ -439,8 +497,7 @@ def update_cache(stack=None, memory=None, pc=None, analysed=None):
                 operation_done = second['op'] # can be delete or create
 
                 if operation_done == CREATE:
-                    cache_state[collection_name]['temp_'+second['id']] =  {
-                        'tx_hash': second['tx_hash'],
+                    cache_state[collection_name]['temp_'+second['tx_hash']] =  {
                         'submitted_on': second['submitted_on']
                     }
 
@@ -448,10 +505,10 @@ def update_cache(stack=None, memory=None, pc=None, analysed=None):
                     update_attempted = 1
                 
                 elif operation_done == DELETE:
-                    if cache_state[collection_name].get('temp_'+second['id'], False):
-                        del cache_state[collection_name]['temp_'+second['id']]
+                    if cache_state[collection_name].get('temp_'+second['tx_hash'], False):
+                        del cache_state[collection_name]['temp_'+second['tx_hash']]
                     else:
-                        del cache_state[collection_name][second['id']]
+                        del cache_state[collection_name][second['tx_hash']]
 
                     local_second = second
                     update_attempted = 1
@@ -460,18 +517,17 @@ def update_cache(stack=None, memory=None, pc=None, analysed=None):
                 operation_done = newest['op'] # can be delete or create
 
                 if operation_done == CREATE:
-                    cache_state[collection_name]['temp_'+newest['id']] =  {
-                        'tx_hash': newest['tx_hash'],
+                    cache_state[collection_name]['temp_'+newest['tx_hash']] =  {
                         'submitted_on': newest['submitted_on']
                     }
                     local_newest = newest
                     update_attempted = 1
 
                 elif operation_done == DELETE:
-                    if cache_state[collection_name].get('temp_'+newest['id'], False):
-                        del cache_state[collection_name]['temp_'+newest['id']]
+                    if cache_state[collection_name].get('temp_'+newest['tx_hash'], False):
+                        del cache_state[collection_name]['temp_'+newest['tx_hash']]
                     else:
-                        del cache_state[collection_name][newest['id']]
+                        del cache_state[collection_name][newest['tx_hash']]
                     local_newest = newest
                     update_attempted = 1
             
@@ -495,13 +551,15 @@ def update_cache(stack=None, memory=None, pc=None, analysed=None):
                 return stack, memory, pc, cache_state, cache_accounts
 
             else:
-                # final attempt at preventing a full query, get an array of all ids, perform set difference
+                # final attempt at preventing a full query, get a set of all hashes, perform set difference
                 # of local and remote. Time complexity should be O(1) since python uses hash tables for sets
 
                 update_attempted = 0
 
-                remote_ids = set(state_dict['all_ids'].keys())
+                remote_ids = set(state_dict['all_tx_hashes'].keys())
                 local_ids = set(cache_state[collection_name].keys())
+                local_ids.remove('state')
+                local_ids.remove('prev_states')
 
                 # in cache but not remote, means a delete happened
                 to_delete = local_ids - remote_ids
@@ -514,18 +572,23 @@ def update_cache(stack=None, memory=None, pc=None, analysed=None):
                 to_create = remote_ids - local_ids
                 if len(to_create) != 0:
                     for val in to_create:
-                        cache_state[collection_name][val] = {
-                            'submitted_on': state_dict['all_ids'][val]['submitted_on']
+                        cache_state[collection_name]['temp_'+val] = {
+                            'submitted_on': state_dict['all_tx_hashes'][val]
                         }
                         update_attempted = 1
                 
                 if update_attempted:
                     # since we inserted new elements, sort the dict so as to calculate correct hash
-                    sorted_tuples = sorted(cache_state[collection_name].items(), key=lambda item: item[1].get('submitted_on', 0))
+                    log.debug(f"cache after prev_state update but before sort: {cache_state}")
+                    sorted_tuples = sorted(cache_state[collection_name].items(), key=lambda item: item[1]['submitted_on']['unix'] if 'submitted_on' in item[1] and 'unix' in item[1]['submitted_on'] else Decimal(0))
+                    log.debug(f"cache after prev_state update after sort: {sorted_tuples}")
                     cache_state[collection_name] = {k: v for k, v in sorted_tuples}
 
                     # push all hashes to stack
                     cache_hashes = get_collection_hashes(collection_name, cache_state)
+                    if not cache_hashes:
+                        log.error("returned hash list was empty")
+                        return None, None, None, None, None
 
                     # this is to obey the stack law of LIFO(Last in First Out)
                     cache_hashes.reverse()
@@ -604,115 +667,231 @@ def create_entry(stack=None, memory=None, pc=None, analysed=None):
 
     entry_name = stack.pop()
 
-    if entry_name == 'SELL':
-        cache_state['sales']['temp'] = {}
+    if entry_name == SELL:
+        cache_state[EVENTC[SELL]]['temp'] = {}
         order = [ 'submitted_on', 'by', 'tx_hash', 'tray_no', 'tray_price', 'buyer', 'date', 'section' ]
         tx_hash = ''
         for id in order:
             val = stack.pop()
             if id == 'submitted_on' or id == 'date':
-                dt1 = dt.fromtimestamp(val, tz=NBO)
+                dt1 = dt.fromtimestamp(int(val), tz=NBO)
                 locale = dt1.strftime("%m/%d/%Y, %H:%M:%S")
 
-                cache_state['sales']['temp'][id] = {'unix': val, 'locale': locale+', Africa/Nairobi'}
+                cache_state[EVENTC[SELL]]['temp'][id] = {'unix': val, 'locale': locale+', Africa/Nairobi'}
 
             else:
-                cache_state['sales']['temp'][id] = val
+                cache_state[EVENTC[SELL]]['temp'][id] = val
 
             if id == 'tx_hash':
                 tx_hash = val
 
-        cache_state['sales'][f'new_{tx_hash}'] = cache_state['sales']['temp']
-        del cache_state['sales']['temp']
-        
+        cache_state[EVENTC[SELL]]['temp']['prev_values'] = {}
 
-    elif entry_name == 'BUY':
-        cache_state['purchases']['temp'] = {}
+        # if tx_hash already exists, move to prev field index next, update current
+        if tx_hash in cache_state[EVENTC[SELL]]:
+            index = 0
+            prev_keys = cache_state[EVENTC[SELL]][tx_hash]['prev_values'].keys()
+            if prev_keys:
+                index = int(max(prev_keys))+1
+
+            temp_dict = cache_state[EVENTC[SELL]][tx_hash]
+            cache_state[EVENTC[SELL]]['temp']['prev_values'] = temp_dict['prev_values']
+            del temp_dict['prev_values']
+
+            cache_state[EVENTC[SELL]]['temp']['prev_values'][str(index)] = temp_dict
+            cache_state[EVENTC[SELL]][tx_hash] = cache_state[EVENTC[SELL]]['temp']
+            
+        else:
+            cache_state[EVENTC[SELL]][tx_hash] = cache_state[EVENTC[SELL]]['temp']
+        
+        cache_state[EVENTC[SELL]]['state']['all_tx_hashes'][tx_hash] = cache_state[EVENTC[SELL]][tx_hash]['submitted_on']
+        del cache_state[EVENTC[SELL]]['temp']
+
+        # update the prev_3_states
+        subm_on = cache_state[EVENTC[SELL]][tx_hash]['submitted_on']
+        cache_state[EVENTC[SELL]]['state']['prev_3_states'] = update_prev_3_states(cache_state[EVENTC[SELL]]['state']['prev_3_states'], subm_on, tx_hash)
+
+    elif entry_name == BUY:
+        cache_state[EVENTC[BUY]]['temp'] = {}
         order = [ 'submitted_on', 'by', 'tx_hash', 'item_no', 'item_price', 'item_name', 'date', 'section' ]
         tx_hash = ''
         for id in order:
             val = stack.pop()
 
             if id == 'submitted_on' or id == 'date':
-                dt1 = dt.fromtimestamp(val, tz=NBO)
+                dt1 = dt.fromtimestamp(int(val), tz=NBO)
                 locale = dt1.strftime("%m/%d/%Y, %H:%M:%S")
 
-                cache_state['purchases']['temp'][id] = {'unix': val, 'locale': locale+', Africa/Nairobi'}
+                cache_state[EVENTC[BUY]]['temp'][id] = {'unix': val, 'locale': locale+', Africa/Nairobi'}
                 
             else:
-                cache_state['purchases']['temp'][id] = val
+                cache_state[EVENTC[BUY]]['temp'][id] = val
 
             if id == 'tx_hash':
                 tx_hash = val
+        
+        cache_state[EVENTC[BUY]]['temp']['prev_values'] = {}
 
-        cache_state['purchases'][f'new_{tx_hash}'] = cache_state['purchases']['temp']
-        del cache_state['purchases']['temp']
-    
+        # if tx_hash already exists, move to prev field index next, update current
+        if tx_hash in cache_state[EVENTC[BUY]]:
+            index = 0
+            prev_keys = cache_state[EVENTC[BUY]][tx_hash]['prev_values'].keys()
+            if prev_keys:
+                index = int(max(prev_keys))+1
 
-    elif entry_name == 'DS':
-        cache_state['dead_sick']['temp'] = {}
+            temp_dict = cache_state[EVENTC[BUY]][tx_hash]
+            cache_state[EVENTC[BUY]]['temp']['prev_values'] = temp_dict['prev_values']
+            del temp_dict['prev_values']
+
+            cache_state[EVENTC[BUY]]['temp']['prev_values'][str(index)] = temp_dict
+            cache_state[EVENTC[BUY]][tx_hash] = cache_state[EVENTC[BUY]]['temp']
+            
+        else:
+            cache_state[EVENTC[BUY]][tx_hash] = cache_state[EVENTC[BUY]]['temp']
+
+        cache_state[EVENTC[BUY]]['state']['all_tx_hashes'][tx_hash] = cache_state[EVENTC[BUY]][tx_hash]['submitted_on']
+        del cache_state[EVENTC[BUY]]['temp']
+
+        # update the prev_3_states
+        subm_on = cache_state[EVENTC[BUY]][tx_hash]['submitted_on']
+        cache_state[EVENTC[BUY]]['state']['prev_3_states'] = update_prev_3_states(cache_state[EVENTC[BUY]]['state']['prev_3_states'], subm_on, tx_hash)
+
+    elif entry_name == DS:
+        cache_state[EVENTC[DS]]['temp'] = {}
         order = [ 'submitted_on', 'by', 'image_url', 'image_id', 'reason', 'tx_hash', 'number', 'date', 'section', 'location']
         tx_hash = ''
         for id in order:
             val = stack.pop()
             if id == 'submitted_on' or id == 'date':
-                dt1 = dt.fromtimestamp(val, tz=NBO)
+                dt1 = dt.fromtimestamp(int(val), tz=NBO)
                 locale = dt1.strftime("%m/%d/%Y, %H:%M:%S")
 
-                cache_state['dead_sick']['temp'][id] = {'unix': val, 'locale': locale+', Africa/Nairobi'}
+                cache_state[EVENTC[DS]]['temp'][id] = {'unix': val, 'locale': locale+', Africa/Nairobi'}
                 
             else:
-                cache_state['dead_sick']['temp'][id] = val
+                cache_state[EVENTC[DS]]['temp'][id] = val
 
             if id == 'tx_hash':
                 tx_hash = val
             
-        cache_state['dead_sick'][f'new_{tx_hash}'] = cache_state['dead_sick']['temp']
-        del cache_state['dead_sick']['temp']
+        
+        cache_state[EVENTC[BUY]]['temp']['prev_values'] = {}
 
-    elif entry_name == 'EGGS':
-        cache_state['eggs_collected']['temp'] = {}
+        # if tx_hash already exists, move to prev field index next, update current
+        if tx_hash in cache_state[EVENTC[BUY]]:
+            index = 0
+            prev_keys = cache_state[EVENTC[BUY]][tx_hash]['prev_values'].keys()
+            if prev_keys:
+                index = int(max(prev_keys))+1
+
+            temp_dict = cache_state[EVENTC[BUY]][tx_hash]
+            cache_state[EVENTC[BUY]]['temp']['prev_values'] = temp_dict['prev_values']
+            del temp_dict['prev_values']
+
+            cache_state[EVENTC[BUY]]['temp']['prev_values'][str(index)] = temp_dict
+            cache_state[EVENTC[BUY]][tx_hash] = cache_state[EVENTC[BUY]]['temp']
+            
+        else:
+            cache_state[EVENTC[BUY]][tx_hash] = cache_state[EVENTC[BUY]]['temp']
+        
+        cache_state[EVENTC[DS]]['state']['all_tx_hashes'][tx_hash] = cache_state[EVENTC[DS]][tx_hash]['submitted_on']
+        del cache_state[EVENTC[DS]]['temp']
+        
+        # update the prev_3_states
+        subm_on = cache_state[EVENTC[DS]][tx_hash]['submitted_on']
+        cache_state[EVENTC[DS]]['state']['prev_3_states'] = update_prev_3_states(cache_state[EVENTC[DS]]['state']['prev_3_states'], subm_on, tx_hash)
+
+
+    elif entry_name == EGGS:
+        cache_state[EVENTC[EGGS]]['temp'] = {}
         order = [ 'submitted_on', 'by', 'tx_hash', 'a1', 'a2', 'b1', 'b2', 'c1', 'c2', 'broken', 'house', 'date', 'trays_collected']
         tx_hash = ''
         for id in order:
             val = stack.pop()
             if id == 'submitted_on' or id == 'date':
-                dt1 = dt.fromtimestamp(val, tz=NBO)
+                dt1 = dt.fromtimestamp(int(val), tz=NBO)
                 locale = dt1.strftime("%m/%d/%Y, %H:%M:%S")
-
-                cache_state['eggs_collected']['temp'][id] = {'unix': val, 'locale': locale+', Africa/Nairobi'}
+                cache_state[EVENTC[EGGS]]['temp'][id] = {'unix': val, 'locale': locale+', Africa/Nairobi'}
                 
             else:
-                cache_state['eggs_collected']['temp'][id] = val
+                cache_state[EVENTC[EGGS]]['temp'][id] = val
 
             if id == 'tx_hash':
                 tx_hash = val
         
-        cache_state['eggs_collected'][f'new_{tx_hash}'] = cache_state['eggs_collected']['temp']
-        del cache_state['eggs_collected']['temp']
 
-    elif entry_name == 'TRADE':
-        cache_state['trades']['temp'] = {}
+        cache_state[EVENTC[EGGS]]['temp']['prev_values'] = {}
+
+        # if tx_hash already exists, move to prev field index next, update current
+        if tx_hash in cache_state[EVENTC[EGGS]]:
+            index = 0
+            prev_keys = cache_state[EVENTC[EGGS]][tx_hash]['prev_values'].keys()
+            if prev_keys:
+                index = int(max(prev_keys))+1
+
+            temp_dict = cache_state[EVENTC[EGGS]][tx_hash]
+            cache_state[EVENTC[EGGS]]['temp']['prev_values'] = temp_dict['prev_values']
+            del temp_dict['prev_values']
+
+            cache_state[EVENTC[EGGS]]['temp']['prev_values'][str(index)] = temp_dict
+            cache_state[EVENTC[EGGS]][tx_hash] = cache_state[EVENTC[EGGS]]['temp']
+            
+        else:
+            cache_state[EVENTC[EGGS]][tx_hash] = cache_state[EVENTC[EGGS]]['temp']
+
+        cache_state[EVENTC[EGGS]]['state']['all_tx_hashes'][tx_hash] = cache_state[EVENTC[EGGS]][tx_hash]['submitted_on']
+        del cache_state[EVENTC[EGGS]]['temp']
+
+        # update the prev_3_states
+        subm_on = cache_state[EVENTC[EGGS]][tx_hash]['submitted_on']
+        cache_state[EVENTC[EGGS]]['state']['prev_3_states'] = update_prev_3_states(cache_state[EVENTC[EGGS]]['state']['prev_3_states'], subm_on, tx_hash)
+
+
+    elif entry_name == TRADE:
+        cache_state[EVENTC[TRADE]]['temp'] = {}
         order = [ 'submitted_on', 'by', 'tx_hash', 'from', 'to', 'purchase_hash', 'sale_hash', 'amount', 'date']
         tx_hash = ''
         for id in order:
             val = stack.pop()
 
             if id == 'submitted_on' or id == 'date':
-                dt1 = dt.fromtimestamp(val, tz=NBO)
+                dt1 = dt.fromtimestamp(int(val), tz=NBO)
                 locale = dt1.strftime("%m/%d/%Y, %H:%M:%S")
 
-                cache_state['trades']['temp'][id] = {'unix': val, 'locale': locale+', Africa/Nairobi'}
+                cache_state[EVENTC[TRADE]]['temp'][id] = {'unix': val, 'locale': locale+', Africa/Nairobi'}
                 
             else:
-                cache_state['trades']['temp'][id] = val
+                cache_state[EVENTC[TRADE]]['temp'][id] = val
 
             if id == 'tx_hash':
                 tx_hash = val
         
-        cache_state['trades'][f'new_{tx_hash}'] = cache_state['trades']['temp']
-        del cache_state['trades']['temp']
-    
+        cache_state[EVENTC[TRADE]]['temp']['prev_values'] = {}
+
+        # if tx_hash already exists, move to prev field index next, update current
+        if tx_hash in cache_state[EVENTC[TRADE]]:
+            index = 0
+            prev_keys = cache_state[EVENTC[TRADE]][tx_hash]['prev_values'].keys()
+            if prev_keys:
+                index = int(max(prev_keys))+1
+
+            temp_dict = cache_state[EVENTC[TRADE]][tx_hash]
+            cache_state[EVENTC[TRADE]]['temp']['prev_values'] = temp_dict['prev_values']
+            del temp_dict['prev_values']
+
+            cache_state[EVENTC[TRADE]]['temp']['prev_values'][str(index)] = temp_dict
+            cache_state[EVENTC[TRADE]][tx_hash] = cache_state[EVENTC[TRADE]]['temp']
+            
+        else:
+            cache_state[EVENTC[TRADE]][tx_hash] = cache_state[EVENTC[TRADE]]['temp']
+
+        cache_state[EVENTC[TRADE]]['state']['all_tx_hashes'][tx_hash] = cache_state[EVENTC[TRADE]][tx_hash]['submitted_on']
+        del cache_state[EVENTC[TRADE]]['temp']
+
+        # update the prev_3_states
+        subm_on = cache_state[EVENTC[TRADE]][tx_hash]['submitted_on']
+        cache_state[EVENTC[TRADE]]['state']['prev_3_states'] = update_prev_3_states(cache_state[EVENTC[TRADE]]['state']['prev_3_states'], subm_on, tx_hash)
+
     else:
         log.error("Invalid entry")
         return None, None, None, None, None
@@ -726,15 +905,24 @@ def delete_entry(stack=None, memory=None, pc=None, analysed=None):
     log.debug(f"{pc}: DENTRY")
     pc += 1
 
-    entry_id = stack.pop()
+    tx_hash = stack.pop()
     collection_name = stack.pop()
 
     if collection_name in cache_state:
-        if entry_id in cache_state[collection_name]:
-            del cache_state[collection_name][entry_id]
+        if tx_hash in cache_state[collection_name]:
+            dt1 = dt.fromtimestamp(time.time(), tz=NBO)
+            locale = dt1.strftime("%m/%d/%Y, %H:%M:%S")
+
+            cache_deleted[tx_hash] = {
+                collection: collection_name,
+                entry: cache_state[collection_name][tx_hash],
+                submitted_on: {'unix': time.time(), 'locale': locale+', Africa/Nairobi'},
+                by: memory.get('user', 'null')
+            }
+            del cache_state[collection_name][tx_hash]
             return stack, memory, pc, cache_state, cache_accounts
     
-    log.error(f"collection name: {collection_name} or entry id: {entry_id} does not exist")
+    log.error(f"collection name: {collection_name} or tx_hash: {tx_hash} does not exist")
     return None, None, None, None, None
 
 
@@ -863,6 +1051,20 @@ def prep_finalise_data(stack=None, memory=None, pc=None, analysed=None):
             pc += 1
 
     return stack, memory, pc, cache_state, cache_accounts
+
+
+def calculate_state_root(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: CALCSTATE")
+    pc += 1
+
+    collection_name = stack.pop()
+    if not collection_name in cache_state:
+        log.error(f"collection name {collection_name} does not exist")
+        return None, None, None, None, None
+    
+    for tx in cache_state[collection_name]:
+        pass
+
 
 
 
@@ -1060,11 +1262,10 @@ inst_mapping = {
     str(SWAP): swap,
     str(ISZERO): is_zero,
     str(STOP): stop,
-    str(TXHASH): tx_hash,
     str(TXVALSHASH): tx_values_to_hash,
     str(COLLHASH): collection_hashes_to_hash,
     str(ROOTHASH): root_hash,
-    str(SHA512): sha512,
+    str(sha256): sha256,
     str(UPDATECACHE): update_cache,
     str(STATE): get_state,
     str(PREPFINALISE): prep_finalise_data,
@@ -1097,7 +1298,7 @@ PUSH y // tray_no
 PUSH 5
 DUP
 PUSH 5
-SHA512 // tx_hash
+sha256 // tx_hash
 PUSH f // by
 NOW    // submitted_on
 PUSH EVENT
@@ -1121,7 +1322,7 @@ PUSH y // item_no
 PUSH 5
 DUP
 PUSH 5
-SHA512 // tx_hash
+sha256 // tx_hash
 PUSH f // by
 NOW    // submitted_on
 PUSH EVENT
@@ -1137,7 +1338,7 @@ PUSH amount
 PUSH 6
 DUP
 PUSH 6
-SHA512 // tx_hash
+sha256 // tx_hash
 PUSH f // by
 NOW    // submitted_on
 PUSH y
@@ -1169,7 +1370,7 @@ PUSH y // tray_no
 PUSH 5
 DUP
 PUSH 5
-SHA512 // tx_hash
+sha256 // tx_hash
 PUSH f // by
 NOW    // submitted_on
 PUSH EVENT
@@ -1184,7 +1385,7 @@ PUSH y // number
 PUSH 4
 DUP
 PUSH 4
-SHA512 // tx_hash
+sha256 // tx_hash
 PUSH r // reason
 PUSH i // image_id
 PUSH u // image_url
@@ -1199,12 +1400,12 @@ CENTRY
 
 {after all create/delete operations execute this instructions}
 PREPFINALISE
-SHA512
+sha256
 TXHASH
 EQ
 EXITLOOP
 JUMPIF
-SHA512
+sha256
 SWAP
 ROOTHASH
 EQ

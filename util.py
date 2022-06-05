@@ -1,14 +1,42 @@
 # UTILITIES
 
 import hashlib
+from decimal import *
 from log_ import log
+from constants import CREATE, DELETE
+
+
+def update_prev_3_states(prev_3, submitted_on, tx_hash):
+    if not prev_3['0']['op']:
+        prev_3['0']['op'] = DELETE
+        prev_3['0']['tx_hash'] = tx_hash
+        prev_3['0']['submitted_on'] = submitted_on
+
+    elif not prev_3['1']['op']:
+        prev_3['1']['op'] = DELETE
+        prev_3['1']['tx_hash'] = tx_hash
+        prev_3['1']['submitted_on'] = submitted_on
+
+    elif not prev_3['2']['op']:
+        prev_3['2']['op'] = DELETE
+        prev_3['2']['tx_hash'] = tx_hash
+        prev_3['2']['submitted_on'] = submitted_on
+    
+    return prev_3
+        
+
 
 def get_collection_hashes(collection_name, cache_state):
     hashes = []
     for key in cache_state[collection_name]:
-        if key != 'state':
-            if 'tx_hash' in cache_state[collection_name][key]:
-                hashes.append(cache_state[collection_name][key]['tx_hash'])
+        if key != 'state' and key != 'prev_states':
+            is_valid_hash = re.search("^[a-f0-9]{64}$", key)
+
+            if not is_valid_hash:
+                log.warning(f"Key appended not a valid hash, {to_check_hash}")
+                return []
+            
+            hashes.append(key)
     
     return hashes
 

@@ -1,11 +1,14 @@
 # Virtual Machine
 from functools import reduce
 from decimal import *
+import re
+import sys
 
 import opcodes
 from log_ import log
 from stack import Stack
 from instructions import inst_mapping
+from constants import VALID_BUY_SECTIONS, VALID_SELL_SECTIONS, VALID_BUYERS
 
 
 class VM:
@@ -15,7 +18,7 @@ class VM:
         self.memory = {}
         self.pc = 0             # program counter
         self.cache_state = {}
-        self.cache_accounts = {}
+        self.cache_accounts = {'BLACK_HOLE': sys.maxsize} # main money supplier
         self.analysed_code = {}
         self.is_safe = self.check_safety()
 
@@ -63,8 +66,6 @@ class VM:
                     return False
                 
                 return self.stack.size()-1 >= int(num) and int(num) > 0 
-            case opcodes.TXHASH:
-                return self.stack.size() > 1 and isinstance(self.stack.peek(), str) and isinstance(self.stack.peek2(), str) 
             case opcodes.ISZERO:
                 return self.stack.size() > 0 and isinstance(self.stack.peek(), Decimal) 
             case opcodes.EQ:
@@ -72,7 +73,17 @@ class VM:
             case opcodes.COLLHASH:
                 return self.stack.size() > 0 and isinstance(self.stack.peek(), str)
             case opcodes.TXVALSHASH:
-                return self.stack.size() > 1 and isinstance(self.stack.peek(), str) and isinstance(self.stack.peek2(), str)
+                if self.stack.size() > 1 and isinstance(self.stack.peek(), str) and isinstance(self.stack.peek2(), str):
+                    # check if valid hash
+                    to_check_hash = self.stack.peek()
+                    is_valid_hash = re.search("^[a-f0-9]{64}$", to_check_hash)
+
+                    if not is_valid_hash:
+                        log.warning(f"Invalid hash provided, {to_check_hash}")
+                        return False
+                    return True
+                
+                return False
             case opcodes.STATE:
                 return self.stack.size() > 0 and isinstance(self.stack.peek(), str)
             case opcodes.UPDATECACHE:
@@ -89,7 +100,7 @@ class VM:
             case opcodes.CENTRY:
                 first_check = self.stack.size() > 0 and isinstance(self.stack.peek(), str)
                 if not first_check:
-                    log.debug("entry name not string")
+                    log.warning(f"entry name not string but {type(self.stack.peek())}, val: {self.stack.peek()} or stack size is 0: {self.stack.size()}")
                     return False
                 
                 entry_name = self.stack.peek()
@@ -100,21 +111,52 @@ class VM:
                             # [ 'entry_name', 'submitted_on', 'by', 'tx_hash', 'tray_no', 'tray_price', 'buyer', 'date', 'section' ]
                             values.reverse()
                             values.pop(0) # we don't need entry_name
+
                             bool_list = []
-                            bool_list.append(isinstance(values[0], Decimal))
+                            bool_list.append(isinstance(values[0], Decimal) and values[0] >= 0)
                             bool_list.append(isinstance(values[1], str))
                             bool_list.append(isinstance(values[2], str))
-                            bool_list.append(isinstance(values[3], Decimal))
-                            bool_list.append(isinstance(values[4], Decimal))
+                            bool_list.append(isinstance(values[3], Decimal) and values[3] > 0)
+                            bool_list.append(isinstance(values[4], Decimal) and values[4] > 0)
                             bool_list.append(isinstance(values[5], str))
-                            bool_list.append(isinstance(values[6], Decimal))
+                            bool_list.append(isinstance(values[6], Decimal) and values[6] >= 0)
                             bool_list.append(isinstance(values[7], str))
                             
                             log.debug(f"bool type list: {bool_list}")
                             res = reduce(lambda a, b: a and b, bool_list)
-                            return isinstance(res, bool) and res
+                            
+                            if isinstance(res, bool) and res:
+                                # check if valid hash
+                                to_check_hash = values[2]
+                                is_valid_hash = re.search("^[a-f0-9]{64}$", to_check_hash)
 
-                        log.debug(f"stack size not 9 or greater but {self.stack.size()}")
+                                if not is_valid_hash:
+                                    log.warning(f"Invalid hash provided, {to_check_hash}")
+                                    return False
+                                
+                                # check if valid section
+                                if values[7] not in VALID_SELL_SECTIONS:
+                                    log.warning(f"Invalid section provided, {values[7]}")
+                                    return False
+                                
+                                # check if valid buyer
+                                if values[5] not in VALID_BUYERS and values[7] == "OTHER":
+                                    log.warning(f"Invalid buyer name provided, {values[5]}")
+                                    return False
+                                
+                                if values[7] in ["THIKAFARMERS", "CAKES", "DUKA"]:
+                                    for idx, x in enumerate(self.stack.get_stack()):
+                                        if x == values[5]:
+                                            self.stack.replace(idx, values[7])
+                                            log.warning(f"Buyer name updated to, {values[7]}")
+                                            break
+
+                                return True
+                            else:
+                                log.warning(f"reduced bool list not True but {res} of type {type(res)}")
+                                return False
+
+                        log.warning(f"stack size not 9 or greater but {self.stack.size()}")
                         return False
                     case 'BUY':
                         if self.stack.size() >= 9:
@@ -122,21 +164,51 @@ class VM:
                             # [ 'entry_name', 'submitted_on', 'by', 'tx_hash', 'item_no', 'item_price', 'item_name', 'date', 'section' ]
                             values.reverse()
                             values.pop(0) # we don't need entry_name
+
                             bool_list = []
-                            bool_list.append(isinstance(values[0], Decimal))
+                            bool_list.append(isinstance(values[0], Decimal)  and values[0] >= 0)
                             bool_list.append(isinstance(values[1], str))
                             bool_list.append(isinstance(values[2], str))
-                            bool_list.append(isinstance(values[3], Decimal))
-                            bool_list.append(isinstance(values[4], Decimal))
+                            bool_list.append(isinstance(values[3], Decimal)  and values[3] > 0)
+                            bool_list.append(isinstance(values[4], Decimal)  and values[4] > 0)
                             bool_list.append(isinstance(values[5], str))
-                            bool_list.append(isinstance(values[6], Decimal))
+                            bool_list.append(isinstance(values[6], Decimal)  and values[6] >= 0)
                             bool_list.append(isinstance(values[7], str))
                             
                             log.debug(f"bool type list: {bool_list}")
                             res = reduce(lambda a, b: a and b, bool_list)
-                            return isinstance(res, bool) and res
 
-                        log.debug(f"stack size not 9 or greater but {self.stack.size()}")
+                            if isinstance(res, bool) and res:
+                                # check if valid hash
+                                to_check_hash = values[2]
+                                is_valid_hash = re.search("^[a-f0-9]{64}$", to_check_hash)
+
+                                if not is_valid_hash:
+                                    log.warning(f"Invalid hash provided, {to_check_hash}")
+                                    return False
+                                
+                                # check if valid section
+                                if values[7] not in VALID_BUY_SECTIONS:
+                                    log.warning(f"Invalid section provided, {values[7]}")
+                                    return False
+                                
+                                if values[7] == "FEEDS" and values[5] not in ["LAYERS", "CHICK"]:
+                                    log.warning(f"Invalid feeds item provided, {values[5]}")
+                                    return False
+                                
+                                if values[7] in ["PURITY"]:
+                                    for idx, x in enumerate(self.stack.get_stack()):
+                                        if x == values[5]:
+                                            self.stack.replace(idx, values[7])
+                                            log.warning(f"Item name updated to, {values[7]}")
+                                            break
+                                
+                                return True
+                            else:
+                                log.warning(f"reduced bool list not True but {res} of type {type(res)}")
+                                return False
+
+                        log.warning(f"stack size not 9 or greater but {self.stack.size()}")
                         return False
                     case 'DS':
                         if self.stack.size() >= 11:
@@ -144,23 +216,37 @@ class VM:
                             # [ 'entry_name', 'submitted_on', 'by', 'image_url', 'image_id', 'reason', 'tx_hash', 'number', 'date', 'section', 'location']
                             values.reverse()
                             values.pop(0) # we don't need entry_name
+                            
                             bool_list = []
-                            bool_list.append(isinstance(values[0], Decimal))
+                            bool_list.append(isinstance(values[0], Decimal)  and values[0] >= 0)
                             bool_list.append(isinstance(values[1], str))
                             bool_list.append(isinstance(values[2], str))
                             bool_list.append(isinstance(values[3], str))
                             bool_list.append(isinstance(values[4], str))
                             bool_list.append(isinstance(values[5], str))
-                            bool_list.append(isinstance(values[6], Decimal))
-                            bool_list.append(isinstance(values[7], Decimal))
+                            bool_list.append(isinstance(values[6], Decimal)  and values[6] > 0)
+                            bool_list.append(isinstance(values[7], Decimal)  and values[7] >= 0)
                             bool_list.append(isinstance(values[8], str))
                             bool_list.append(isinstance(values[9], str))
                             
                             log.debug(f"bool type list: {bool_list}")
                             res = reduce(lambda a, b: a and b, bool_list)
-                            return isinstance(res, bool) and res
 
-                        log.debug(f"stack size not 11 or greater but {self.stack.size()}")
+                            if isinstance(res, bool) and res:
+                                # check if valid hash
+                                to_check_hash = values[5]
+                                is_valid_hash = re.search("^[a-f0-9]{64}$", to_check_hash)
+
+                                if not is_valid_hash:
+                                    log.warning(f"Invalid hash provided, {to_check_hash}")
+                                    return False
+
+                                return True
+                            else:
+                                log.warning(f"reduced bool list not True but {res} of type {type(res)}")
+                                return False
+
+                        log.warning(f"stack size not 11 or greater but {self.stack.size()}")
                         return False
                     case 'EGGS':
                         if self.stack.size() >= 14:
@@ -168,26 +254,40 @@ class VM:
                             # [ 'entry_name', 'submitted_on', 'by', 'tx_hash', 'a1', 'a2', 'b1', 'b2', 'c1', 'c2', 'broken', 'house', 'date', 'trays_collected']
                             values.reverse()
                             values.pop(0) # we don't need entry_name
+
                             bool_list = []
-                            bool_list.append(isinstance(values[0], Decimal))
+                            bool_list.append(isinstance(values[0], Decimal)  and values[0] >= 0)
                             bool_list.append(isinstance(values[1], str))
                             bool_list.append(isinstance(values[2], str))
-                            bool_list.append(isinstance(values[3], Decimal))
-                            bool_list.append(isinstance(values[4], Decimal))
-                            bool_list.append(isinstance(values[5], Decimal))
-                            bool_list.append(isinstance(values[6], Decimal))
-                            bool_list.append(isinstance(values[7], Decimal))
-                            bool_list.append(isinstance(values[8], Decimal))
-                            bool_list.append(isinstance(values[9], Decimal))
-                            bool_list.append(isinstance(values[10], Decimal))
-                            bool_list.append(isinstance(values[11], Decimal))
-                            bool_list.append(isinstance(values[12], str))
+                            bool_list.append(isinstance(values[3], Decimal)  and values[3] > 0 and values[3] <= 75)
+                            bool_list.append(isinstance(values[4], Decimal)  and values[4] > 0 and values[4] <= 75)
+                            bool_list.append(isinstance(values[5], Decimal)  and values[5] > 0 and values[5] <= 75)
+                            bool_list.append(isinstance(values[6], Decimal)  and values[6] > 0 and values[6] <= 75)
+                            bool_list.append(isinstance(values[7], Decimal)  and values[7] > 0 and values[7] <= 75)
+                            bool_list.append(isinstance(values[8], Decimal)  and values[8] > 0 and values[8] <= 75)
+                            bool_list.append(isinstance(values[9], Decimal)  and values[9] > 0)
+                            bool_list.append(isinstance(values[10], Decimal)  and values[10] > 0)
+                            bool_list.append(isinstance(values[11], Decimal)  and values[11] >= 0)
+                            bool_list.append(isinstance(values[12], str) and not not re.search("^[\d]+,([0-9]|1[0-9]|2[0-9])$", values[12]))
                             
                             log.debug(f"bool type list: {bool_list}")
                             res = reduce(lambda a, b: a and b, bool_list)
-                            return isinstance(res, bool) and res
 
-                        log.debug(f"stack size not 14 or greater but {self.stack.size()}")
+                            if isinstance(res, bool) and res:
+                                # check if valid hash
+                                to_check_hash = values[2]
+                                is_valid_hash = re.search("^[a-f0-9]{64}$", to_check_hash)
+
+                                if not is_valid_hash:
+                                    log.warning(f"Invalid hash provided, {to_check_hash}")
+                                    return False
+
+                                return True
+                            else:
+                                log.warning(f"reduced bool list not True but {res} of type {type(res)}")
+                                return False
+
+                        log.warning(f"stack size not 14 or greater but {self.stack.size()}")
                         return False
                     case 'TRADE':
                         if self.stack.size() >= 10:
@@ -195,22 +295,39 @@ class VM:
                             # [ 'entry_name', 'submitted_on', 'by', 'tx_hash', 'from', 'to', 'purchase_hash', 'sale_hash', 'amount', 'date']
                             values.reverse()
                             values.pop(0) # we don't need entry_name
+
                             bool_list = []
-                            bool_list.append(isinstance(values[0], Decimal))
+                            bool_list.append(isinstance(values[0], Decimal)  and values[0] >= 0)
                             bool_list.append(isinstance(values[1], str))
                             bool_list.append(isinstance(values[2], str))
-                            bool_list.append(isinstance(values[3], str))
-                            bool_list.append(isinstance(values[4], str))
+                            bool_list.append(isinstance(values[3], str) and not not self.cache_accounts.get(values[3], 0)) # from
+                            bool_list.append(isinstance(values[4], str) and not not values[4]) # to
                             bool_list.append(isinstance(values[5], str))
                             bool_list.append(isinstance(values[6], str))
-                            bool_list.append(isinstance(values[7], Decimal))
-                            bool_list.append(isinstance(values[8], Decimal))
+                            bool_list.append(isinstance(values[7], Decimal)  and values[7] > 0)
+                            bool_list.append(isinstance(values[8], Decimal)  and values[8] >= 0)
+
+                            if isinstance(values[5], str) and isinstance(values[6], str) and values[5] and values[6]:
+                                log.warning(f"sale hash and purchase hash not empty, contains, purchase hash: {values[5]}, sale hash: {values[6]}")
+                                return False
                             
                             log.debug(f"bool type list: {bool_list}")
                             res = reduce(lambda a, b: a and b, bool_list)
-                            return isinstance(res, bool) and res
+                            if isinstance(res, bool) and res:
+                                # check if valid hash
+                                to_check_hash = values[2]
+                                is_valid_hash = re.search("^[a-f0-9]{64}$", to_check_hash)
 
-                        log.debug(f"stack size not 9 or greater but {self.stack.size()}")
+                                if not is_valid_hash:
+                                    log.warning(f"Invalid hash provided, {to_check_hash}")
+                                    return False
+                                 
+                                return True
+                            else:
+                                log.warning(f"reduced bool list not True but {res} of type {type(res)}")
+                                return False
+
+                        log.warning(f"stack size not 9 or greater but {self.stack.size()}")
                         return False
                     case _:
                         return False
