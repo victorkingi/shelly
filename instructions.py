@@ -308,7 +308,7 @@ def root_hash(stack=None, memory=None, pc=None, analysed=None):
 
 
 def sha256(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: sha256")
+    log.debug(f"{pc}: SHA256")
     pc += 1
 
     m = hashlib.sha256()
@@ -1265,7 +1265,7 @@ inst_mapping = {
     str(TXVALSHASH): tx_values_to_hash,
     str(COLLHASH): collection_hashes_to_hash,
     str(ROOTHASH): root_hash,
-    str(sha256): sha256,
+    str(SHA256): sha256,
     str(UPDATECACHE): update_cache,
     str(STATE): get_state,
     str(PREPFINALISE): prep_finalise_data,

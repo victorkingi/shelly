@@ -9,7 +9,7 @@ class Stack:
                 if type(element) != list:
                     self.stack.append(t)
                 else:
-                    self.stack.push(t)
+                    self.push(t)
     
     
     def pop(self):

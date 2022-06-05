@@ -16,7 +16,7 @@ EQ = 9
 ISZERO = 10
 
 # Hash
-SHA512 = 11
+SHA256 = 11
 ROOTHASH = 12
 TXHASH = 13
 

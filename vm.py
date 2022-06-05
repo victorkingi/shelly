@@ -56,7 +56,7 @@ class VM:
                 return True
             case opcodes.ROOTHASH:
                 return self.stack.size() > 0 and isinstance(self.stack.peek(), str)
-            case opcodes.SHA512:
+            case opcodes.SHA256:
                 # lowest case in a sha512 is 1 element needed, hence, stack size of 2
                 if self.stack.size() < 2:
                     return False
@@ -100,7 +100,7 @@ class VM:
             case opcodes.CENTRY:
                 first_check = self.stack.size() > 0 and isinstance(self.stack.peek(), str)
                 if not first_check:
-                    log.warning(f"entry name not string but {type(self.stack.peek())}, val: {self.stack.peek()} or stack size is 0: {self.stack.size()}")
+                    log.warning(f"stack size is 0: {self.stack.size()} or entry name is not a string")
                     return False
                 
                 entry_name = self.stack.peek()
