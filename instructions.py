@@ -7,6 +7,7 @@ from datetime import datetime as dt
 from dateutil import tz
 import time
 import sys
+import re
 
 from opcodes import *
 from util import *
@@ -128,7 +129,7 @@ cache_state = {
         'prev_states': {}
     }
 }
-cache_accounts = {'BLACK_HOLE': sys.maxsize }
+cache_accounts = {'BLACK_HOLE': Decimal(sys.maxsize) }
 cache_deleted = {} # no need to keep track of this as entries are only dumped into it
 
 
@@ -138,7 +139,7 @@ def push(elem=None, stack=None, memory=None, pc=None, analysed=None):
     pc += 2
 
     if isinstance(elem, float) or isinstance(elem, int):
-        elem = Decimal(elem)
+        elem = Decimal(str(elem))
         log.debug(f"converted from {prev_type} to {type(elem)}")
 
     if isinstance(elem, Decimal) or isinstance(elem, str):
@@ -156,6 +157,27 @@ def add(stack=None, memory=None, pc=None, analysed=None):
     a = stack.pop()
     b = stack.pop()
     stack.push(b + a)
+    
+    return stack, memory, pc, cache_state, cache_accounts
+
+
+def lt(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: LT")
+    pc += 1
+
+    a = stack.pop()
+    b = stack.pop()
+    stack.push(Decimal(1) if b < a else Decimal(0))
+    
+    return stack, memory, pc, cache_state, cache_accounts
+
+def gt(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: GT")
+    pc += 1
+
+    a = stack.pop()
+    b = stack.pop()
+    stack.push(Decimal(1) if b > a else Decimal(0))
     
     return stack, memory, pc, cache_state, cache_accounts
 
@@ -290,6 +312,37 @@ def stop(stack=None, memory=None, pc=None, analysed=None):
     return stack, memory, -1, cache_state, cache_accounts
 
 
+def mstore(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: MSTORE")
+    pc += 1
+
+    elem = stack.pop()
+    if not isinstance(elem, str):
+        log.error(f"expected to store a string but found {type(elem)}")
+        return None, None, None, None, None
+
+    is_valid_hash = re.search("^[a-f0-9]{64}$", elem)
+    event_keys = EVENTC.keys()
+    if is_valid_hash:
+        memory['SHA256'] = elem
+    elif elem in event_keys:
+        memory['EVENT'] = elem
+    else:
+        log.error("storage location not assigned yet")
+        return None, None, None, None, None
+
+    return stack, memory, pc, cache_state, cache_accounts
+
+
+def mload(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: MLOAD")
+    pc += 1
+
+    key = stack.pop()
+    stack.push(memory[key])
+
+    return stack, memory, pc, cache_state, cache_accounts
+
 # pushes root hash of a collection to stack
 def root_hash(stack=None, memory=None, pc=None, analysed=None):
     log.debug(f"{pc}: ROOTHASH")
@@ -326,6 +379,18 @@ def sha256(stack=None, memory=None, pc=None, analysed=None):
     return stack, memory, pc, cache_state, cache_accounts
 
 
+def panic(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: PANIC")
+    pc += 1
+
+    val = stack.pop()
+
+    if val:
+        log.error("Program exited with panic")
+        return None, None, None, None, None
+
+    return stack, memory, pc, cache_state, cache_accounts
+
 def is_zero(stack=None, memory=None, pc=None, analysed=None):
     log.debug(f"{pc}: ISZERO")
     pc += 1
@@ -348,44 +413,6 @@ def eq(stack=None, memory=None, pc=None, analysed=None):
     return stack, memory, pc, cache_state, cache_accounts
 
 
-# followed by sha256
-def collection_hashes_to_hash(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: COLLHASH")
-    pc += 1
-
-    collection_name = stack.pop()
-    if not collection_name in cache_state:
-        log.error(f"collection name {collection_name} does not exist")
-        return None, None, None, None, None
-
-    cache_hashes = get_collection_hashes(collection_name, cache_state)
-    cache_hashes.reverse()
-
-    stack.push(cache_hashes)
-    stack.push(len(cache_hashes))
-    return stack, memory, pc, cache_state, cache_accounts
-
-
-# followed by sha256
-def tx_values_to_hash(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: TXVALSHASH")
-    log.debug(f"cache state: {cache_state}")
-    pc += 1
-
-    tx_hash_ = stack.pop()
-    collection_name = stack.pop()
-
-    if not collection_name in cache_state:
-        log.error(f"collection name {collection_name} does not exist")
-        return None, None, None, None, None
-    
-    values_to_hash = get_tx_data_to_hash(name=collection_name, cache_state=cache_state, tx_hash_=tx_hash_)
-    values_to_hash.reverse()
-
-    stack.push(values_to_hash)
-    stack.push(len(values_to_hash))
-
-    return stack, memory, pc, cache_state, cache_accounts
 
 
 def get_state(stack=None, memory=None, pc=None, analysed=None):
@@ -449,6 +476,13 @@ def update_cache(stack=None, memory=None, pc=None, analysed=None):
         cache_state[collection_name]['state'] = state_dict
         for doc in results:
             cache_state[collection_name][doc.id] = doc.to_dict()
+        
+        if collection_name == EVENTC[TRADE]:
+            if 'balances' in state_dict:
+                for user in state_dict['balances']:
+                    cache_accounts[user] = state_dict['balances'][user]
+            else:
+                log.warning("No account exists yet")
     
         return stack, memory, pc, cache_state, cache_accounts
     
@@ -534,7 +568,7 @@ def update_cache(stack=None, memory=None, pc=None, analysed=None):
 
             if update_attempted:
                 # since we inserted new elements, sort the dict so as to calculate correct hash
-                log.debug(f"cache after prev_state update but before sort: {cache_state}")
+                log.debug(f"cache after prev_state update but before sort: {cache_state[collection_name]}")
                 sorted_tuples = sorted(cache_state[collection_name].items(), key=lambda item: item[1]['submitted_on']['unix'] if 'submitted_on' in item[1] and 'unix' in item[1]['submitted_on'] else Decimal(0))
                 log.debug(f"cache after prev_state update after sort: {sorted_tuples}")
                 cache_state[collection_name] = {k: v for k, v in sorted_tuples}
@@ -579,7 +613,7 @@ def update_cache(stack=None, memory=None, pc=None, analysed=None):
                 
                 if update_attempted:
                     # since we inserted new elements, sort the dict so as to calculate correct hash
-                    log.debug(f"cache after prev_state update but before sort: {cache_state}")
+                    log.debug(f"cache after prev_state update but before sort: {cache_state[collection_name]}")
                     sorted_tuples = sorted(cache_state[collection_name].items(), key=lambda item: item[1]['submitted_on']['unix'] if 'submitted_on' in item[1] and 'unix' in item[1]['submitted_on'] else Decimal(0))
                     log.debug(f"cache after prev_state update after sort: {sorted_tuples}")
                     cache_state[collection_name] = {k: v for k, v in sorted_tuples}
@@ -623,7 +657,7 @@ def timestamp_now(stack=None, memory=None, pc=None, analysed=None):
     log.debug(f"{pc}: NOW")
     pc += 1
 
-    stack.push(Decimal('1.6530634936213117e+18'))
+    stack.push(Decimal(1654523316))
     return stack, memory, pc, cache_state, cache_accounts
 
 
@@ -916,7 +950,7 @@ def delete_entry(stack=None, memory=None, pc=None, analysed=None):
             cache_deleted[tx_hash] = {
                 collection: collection_name,
                 entry: cache_state[collection_name][tx_hash],
-                submitted_on: {'unix': time.time(), 'locale': locale+', Africa/Nairobi'},
+                submitted_on: {'unix': Decimal(time.time()), 'locale': locale+', Africa/Nairobi'},
                 by: memory.get('user', 'null')
             }
             del cache_state[collection_name][tx_hash]
@@ -1053,7 +1087,12 @@ def prep_finalise_data(stack=None, memory=None, pc=None, analysed=None):
     return stack, memory, pc, cache_state, cache_accounts
 
 
-def calculate_state_root(stack=None, memory=None, pc=None, analysed=None):
+def lite_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
+    # TODO Implement on second phase of app
+    pass
+
+
+def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
     log.debug(f"{pc}: CALCSTATE")
     pc += 1
 
@@ -1061,11 +1100,356 @@ def calculate_state_root(stack=None, memory=None, pc=None, analysed=None):
     if not collection_name in cache_state:
         log.error(f"collection name {collection_name} does not exist")
         return None, None, None, None, None
+
+    week_in_seconds = 7 * 24 * 60 * 60
+    week_in_seconds = Decimal(week_in_seconds)
+    month_in_seconds = 28 * 24 * 60 * 60
+    month_in_seconds = Decimal(month_in_seconds) 
+
+    log.debug(f"cache after prev_state update but before sort: {cache_state[collection_name]}")
+    sorted_tuples = sorted(cache_state[collection_name].items(), key=lambda item: item[1]['date']['unix'] if 'date' in item[1] and 'unix' in item[1]['date'] else Decimal(0))
+    log.debug(f"cache after prev_state update after sort: {sorted_tuples}")
+    cache_state[collection_name] = {k: v for k, v in sorted_tuples}
+
+    is_first = True
+    next_week = Decimal(0)
+    next_month = Decimal(0)
     
-    for tx in cache_state[collection_name]:
-        pass
+    for id in cache_state[collection_name]:
+        if id == 'state' or id == 'prev_states':
+            continue
+        
+        tx = cache_state[collection_name][id]
+
+        if is_first:
+            next_week = 1654387200 + week_in_seconds
+            next_month = 1654387200 + month_in_seconds
+            is_first = False
+
+        if collection_name == EVENTC[SELL]:
+            # after a sale entry, increase values
+            amount = tx['tray_no'] * tx['tray_price']
+            cache_state[collection_name]['state']['total_earned'] += amount
+            cache_state[collection_name]['state']['total_sales'] += 1
+            cache_state[collection_name]['state']['total_trays_sold'] += tx['tray_no']
+            section = 'section'
+
+            cache_state[collection_name]['state'][f'total_earned_{tx[section].lower()}'] += amount
+            cache_state[collection_name]['state'][f'total_trays_sold_{tx[section].lower()}'] += tx['tray_no']
+
+            # check if new week or new month
+            if tx['date']['unix'] > next_week:
+                # calculate change given last 2 complete weeks
+                prev_week = next_week - week_in_seconds
+
+                if str(prev_week) in cache_state[collection_name]['state']['week_trays_sold_earned']:
+                    prev_week_dict = cache_state[collection_name]['state']['week_trays_sold_earned'][str(prev_week)]
+                    current_week_dict = cache_state[collection_name]['state']['week_trays_sold_earned'][str(next_week)]
+
+                    def f(k, v):
+                        return v - prev_week_dict[k]
+
+                    week_val_diff = {k: f(k, v) for k, v in current_week_dict.items()}
+                    cache_state[collection_name]['state']['change_week'][f'{next_week}'] = week_val_diff
+
+                else:
+                    log.warning(f"Previous week data does not exist, {prev_week}")
+
+                next_week += week_in_seconds
+
+                cache_state[collection_name]['state']['week_trays_sold_earned'][str(next_week)] = {}
+                week_dict = cache_state[collection_name]['state']['week_trays_sold_earned'][str(next_week)]
+
+                week_dict['earned'] = amount
+                week_dict[f'earned_{tx[section].lower()}'] = amount
+                week_dict['trays_sold'] = tx['tray_no']
+                week_dict[f'trays_sold_{tx[section].lower()}'] = tx['tray_no']
+
+            else:
+                week_dict = cache_state[collection_name]['state']['week_trays_sold_earned'][str(next_week)]
+                week_dict['earned'] += amount
+                week_dict[f'earned_{tx[section].lower()}'] += amount
+                week_dict['trays_sold'] += tx['tray_no']
+                week_dict[f'trays_sold_{tx[section].lower()}'] += tx['tray_no']
+            
+            # if new month
+            if tx['date']['unix'] > next_month:
+                # calculate change given last 2 complete months
+                prev_month = next_month - month_in_seconds
+
+                if str(prev_month) in cache_state[collection_name]['state']['month_trays_sold_earned']:
+                    prev_month_dict = cache_state[collection_name]['state']['month_trays_sold_earned'][str(prev_month)]
+                    current_month_dict = cache_state[collection_name]['state']['month_trays_sold_earned'][str(next_month)]
+
+                    def f(k, v):
+                        return v - prev_month_dict[k]
+
+                    month_val_diff = {k: f(k, v) for k, v in current_month_dict.items()}
+                    cache_state[collection_name]['state']['change_month'][f'{next_month}'] = month_val_diff
+
+                else:
+                    log.warning(f"Previous month data does not exist, {prev_month}")
+
+                next_month += month_in_seconds
+
+                cache_state[collection_name]['state']['month_trays_sold_earned'][str(next_month)] = {}
+                month_dict = cache_state[collection_name]['state']['month_trays_sold_earned'][str(next_month)]
+
+                month_dict['earned'] = amount
+                month_dict[f'earned_{tx[section].lower()}'] = amount
+                month_dict['trays_sold'] = tx['tray_no']
+                month_dict[f'trays_sold_{tx[section].lower()}'] = tx['tray_no']
+                
+            else:
+                month_dict = cache_state[collection_name]['state']['month_trays_sold_earned'][str(next_month)]
+                month_dict['earned'] += amount
+                month_dict[f'earned_{tx[section].lower()}'] += amount
+                month_dict['trays_sold'] += tx['tray_no']
+                month_dict[f'trays_sold_{tx[section].lower()}'] += tx['tray_no']
+
+        elif collection_name == EVENTC[BUY]:
+            # after a buy entry, increase values
+            amount = tx['item_no'] * tx['item_price']
+            cache_state[collection_name]['state']['total_spent'] += amount
+            cache_state[collection_name]['state']['total_purchases'] += 1
+            cache_state[collection_name]['state']['total_items_bought'] += tx['item_no']
+            section = 'section'
+
+            cache_state[collection_name]['state'][f'total_spent_{tx[section].lower()}'] += amount
+            cache_state[collection_name]['state'][f'total_items_bought_{tx[section].lower()}'] += tx['item_no']
+
+            # check if new week or new month
+            if tx['date']['unix'] > next_week:
+                # calculate change given last 2 complete weeks
+                prev_week = next_week - week_in_seconds
+
+                if str(prev_week) in cache_state[collection_name]['state']['week_items_bought_spent']:
+                    prev_week_dict = cache_state[collection_name]['state']['week_items_bought_spent'][str(prev_week)]
+                    current_week_dict = cache_state[collection_name]['state']['week_items_bought_spent'][str(next_week)]
+
+                    def f(k, v):
+                        return v - prev_week_dict[k]
+
+                    week_val_diff = {k: f(k, v) for k, v in current_week_dict.items()}
+                    cache_state[collection_name]['state']['change_week'][f'{next_week}'] = week_val_diff
+
+                else:
+                    log.warning(f"Previous week data does not exist, {prev_week}")
+
+                next_week += week_in_seconds
+
+                cache_state[collection_name]['state']['week_items_bought_spent'][str(next_week)] = {}
+                week_dict = cache_state[collection_name]['state']['week_items_bought_spent'][str(next_week)]
+
+                week_dict['spent'] = amount
+                week_dict[f'spent_{tx[section].lower()}'] = amount
+                week_dict['items_bought'] = tx['item_no']
+                week_dict[f'items_bought_{tx[section].lower()}'] = tx['item_no']
+
+            else:
+                week_dict = cache_state[collection_name]['state']['week_items_bought_spent'][str(next_week)]
+                week_dict['spent'] += amount
+                week_dict[f'spent_{tx[section].lower()}'] += amount
+                week_dict['items_bought'] += tx['item_no']
+                week_dict[f'items_bought_{tx[section].lower()}'] += tx['item_no']
+            
+            # if new month
+            if tx['date']['unix'] > next_month:
+                # calculate change given last 2 complete months
+                prev_month = next_month - month_in_seconds
+
+                if str(prev_month) in cache_state[collection_name]['state']['month_items_bought_spent']:
+                    prev_month_dict = cache_state[collection_name]['state']['month_items_bought_spent'][str(prev_month)]
+                    current_month_dict = cache_state[collection_name]['state']['month_items_bought_spent'][str(next_month)]
+
+                    def f(k, v):
+                        return v - prev_month_dict[k]
+
+                    month_val_diff = {k: f(k, v) for k, v in current_month_dict.items()}
+                    cache_state[collection_name]['state']['change_month'][f'{next_month}'] = month_val_diff
+
+                else:
+                    log.warning(f"Previous month data does not exist, {prev_month}")
+
+                next_month += month_in_seconds
+
+                cache_state[collection_name]['state']['month_items_bought_spent'][str(next_month)] = {}
+                month_dict = cache_state[collection_name]['state']['month_items_bought_spent'][str(next_month)]
+
+                month_dict['spent'] = amount
+                month_dict[f'spent_{tx[section].lower()}'] = amount
+                month_dict['items_bought'] = tx['item_no']
+                month_dict[f'items_bought_{tx[section].lower()}'] = tx['item_no']
+                
+            else:
+                month_dict = cache_state[collection_name]['state']['month_items_bought_spent'][str(next_month)]
+                month_dict['spent'] += amount
+                month_dict[f'spent_{tx[section].lower()}'] += amount
+                month_dict['items_bought'] += tx['item_no']
+                month_dict[f'items_bought_{tx[section].lower()}'] += tx['item_no']
+
+        elif collection_name == EVENTC[TRADE]:
+            if cache_state[collection_name]['state']['balances']:
+                cache_state[collection_name]['state']['balances'] = cache_accounts
+            else:
+                log.warning("trades state does not contain any accounts")
+
+        elif collection_name == EVENTC[EGGS]:
+            # after a sale entry, increase values
+            amount = tx['a1'] + tx['a2'] + tx['b1'] + tx['b2'] + tx['c1'] + tx['c2'] + tx['broke'] + tx['house']
+            cache_state[collection_name]['state']['total_eggs'] += amount
+            sections = ['a1','a2', 'b1', 'b2', 'c1', 'c2', 'broke', 'house']
+
+            for sec in sections:
+                state[f'total_eggs_{sec}'] += tx[sec]
+            
+            state['trays_collected_to_timestamp'][str(tx['date'])] = tx['trays_collected']
+            state['diff_trays_to_exact'][str(tx['date'])] = get_diff_eggs(tx['trays_collected'], amount)
+
+            # check if new week or new month
+            if tx['date']['unix'] > next_week:
+                # calculate change given last 2 complete weeks
+                prev_week = next_week - week_in_seconds
+
+                if str(prev_week) in cache_state[collection_name]['state']['week_trays_and_exact']:
+                    prev_week_dict = cache_state[collection_name]['state']['week_trays_and_exact'][str(prev_week)]
+                    current_week_dict = cache_state[collection_name]['state']['week_trays_and_exact'][str(next_week)]
+
+                    def f(k, v):
+                        return get_eggs_diff(v, prev_week_dict[k])[1]
+
+                    week_val_diff = {k: f(k, v) for k, v in current_week_dict.items()}
+                    cache_state[collection_name]['state']['change_week'][f'{next_week}'] = week_val_diff
+
+                else:
+                    log.warning(f"Previous week data does not exist, {prev_week}")
+
+                next_week += week_in_seconds
+
+                if str(next_week) in cache_state[collection_name]['state']['week_trays_and_exact']:
+                    log.warning(f"{next_week} already in cache but should not exist")
+                    return None, None, None, None, None
+
+                cache_state[collection_name]['state']['week_trays_and_exact'][str(next_week)] = {}
+                week_dict = cache_state[collection_name]['state']['week_trays_and_exact'][str(next_week)]
+
+                week_dict['trays_collected'] = tx['trays_collected']
+                week_dict['trays_exact'] = get_eggs(amount)[0]
+
+            else:
+                week_dict = cache_state[collection_name]['state']['week_trays_and_exact'][str(next_week)]
+                week_dict['trays_collected'] = increment_eggs(tx['trays_collected'], week_dict['trays_collected'])[0]
+                week_dict['trays_exact'] = increment_eggs(amount, week_dict['trays_exact'])[0]
+
+                if week_dict['trays_collected'] is None or week_dict['trays_exact'] is None:
+                    return None, None, None, None, None
+            
+            # if new month
+            if tx['date']['unix'] > next_month:
+                # calculate change given last 2 complete months
+                prev_month = next_month - month_in_seconds
+
+                if str(prev_month) in cache_state[collection_name]['state']['month_trays_and_exact']:
+                    prev_month_dict = cache_state[collection_name]['state']['month_trays_and_exact'][str(prev_month)]
+                    current_month_dict = cache_state[collection_name]['state']['month_trays_and_exact'][str(next_month)]
+
+                    def f(k, v):
+                        return get_eggs_diff(v, prev_month_dict[k])[1]
+
+                    month_val_diff = {k: f(k, v) for k, v in current_month_dict.items()}
+                    cache_state[collection_name]['state']['change_month'][f'{next_month}'] = month_val_diff
+
+                else:
+                    log.warning(f"Previous month data does not exist, {prev_month}")
+
+                next_month += month_in_seconds
+
+                if str(next_month) in cache_state[collection_name]['state']['month_trays_and_exact']:
+                    log.warning(f"{next_month} already in cache but should not exist")
+                    return None, None, None, None, None
+
+                cache_state[collection_name]['state']['month_trays_and_exact'][str(next_month)] = {}
+                month_dict = cache_state[collection_name]['state']['month_trays_and_exact'][str(next_month)]
+
+                month_dict['trays_collected'] = tx['trays_collected']
+                month_dict['trays_exact'] = get_eggs(amount)[0]
+
+            else:
+                month_dict = cache_state[collection_name]['state']['month_trays_and_exact'][str(next_month)]
+                month_dict['trays_collected'] = increment_eggs(tx['trays_collected'], month_dict['trays_collected'])[0]
+                month_dict['trays_exact'] = increment_eggs(amount, month_dict['trays_exact'])[0]
+                
+                if month_dict['trays_collected'] is None or month_dict['trays_exact'] is None:
+                    return None, None, None, None, None
+
+        elif collection_name == EVENTC[DS]:
+            if tx['section'] == 'DEAD':
+                state['total_dead'] += 1
+            
+    return stack, memory, pc, cache_state, cache_accounts
 
 
+# incase of new entry, always called after calc state due to dict ordering
+def calculate_root_hash(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: CALCROOTHASH")
+    pc += 1
+
+    collection_name = stack.pop()
+    if not collection_name in cache_state:
+        log.error(f"collection name {collection_name} does not exist")
+        return None, None, None, None, None
+    
+    for id in cache_state[collection_name]:
+        if id == 'state' or id == 'prev_states':
+            continue
+        
+        tx = cache_state[collection_name][id]
+        full_list_data = []
+
+        for k, v in tx.items():
+            if k == 'prev_values':
+                for i_k, i_v in v.items():
+                    if isinstance(i_v, dict):
+                        for ii_k, ii_v in i_v.items():
+                            if isinstance(ii_v, str) or isinstance(ii_v, Decimal):
+                                full_list_data.append(ii_v)
+                            elif isinstance(ii_v, dict):
+                                full_list_data.append(ii_v['unix'])
+                            else:
+                                log.warning(f"Encountered invalid type during hash aggregation, {type(ii_v)}")
+                                return None, None, None, None, None
+                    else:
+                        log.warning(f"Encountered invalid type during hash aggregation, {type(i_v)}")
+                        return None, None, None, None, None
+            else:
+                if isinstance(v, str) or isinstance(v, Decimal):
+                    full_list_data.append(v)
+                elif isinstance(v, dict):
+                    full_list_data.append(v['unix'])
+                else:
+                    log.warning(f"Encountered invalid type during hash aggregation, {type(v)}")
+                    return None, None, None, None, None
+            
+    stack.push(full_list_data)
+    stack.push(Decimal(len(full_list_data)))
+        
+    return stack, memory, pc, cache_state, cache_accounts
+
+
+def update_root_hash(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: UPROOTHASH")
+    pc += 1
+
+    
+
+def balance(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: BALANCE")
+    pc += 1
+
+    name = stack.pop()
+    bal = cache_accounts.get(name, 0)
+    stack.push(Decimal(f'{bal}'))
+    return stack, memory, pc, cache_state, cache_accounts
 
 
 # each week and month is represented by a timestamp
@@ -1086,10 +1470,10 @@ def initialise():
 
             state['trays_collected_to_timestamp'] = {'0': '0,0'}
             state['diff_trays_to_exact'] = {'0': '0,0'} # 0 represents unix 0
-            state['week_trays_and_exact'] = {'0': {'trays_collected': '0,0', 'exact': '0,0'}} # 0 represents timestamp week 0
-            state['month_trays_and_exact'] = {'0': {'trays_collected': '0,0', 'exact': '0,0'}} # 0 represents month 0
-            state['change_week'] = {'0': {'change_trays_collected': 0, 'change_exact': 0 }} # 0 represents (week 0 - week 0), 1 will represent (week 1 - week 0)
-            state['change_month'] = {'0': {'change_trays_collected': 0, 'change_exact': 0 }} # 0 represents (month 0 - month 0), 1 will represent (month 1 - month 0)
+            state['week_trays_and_exact'] = {'1654992000': {'trays_collected': '0,0', 'exact': '0,0'}} # 0 represents timestamp week 0
+            state['month_trays_and_exact'] = {'1656806400': {'trays_collected': '0,0', 'exact': '0,0'}} # 0 represents month 0
+            state['change_week'] = {'1654992000': {'change_trays_collected': 0, 'change_exact': 0 }} # 0 represents (week 0 - week 0), 1 will represent (week 1 - week 0)
+            state['change_month'] = {'1656806400': {'change_trays_collected': 0, 'change_exact': 0 }} # 0 represents (month 0 - month 0), 1 will represent (month 1 - month 0)
 
         elif name == 'sales':
             state['total_sales'] = 0
@@ -1101,7 +1485,7 @@ def initialise():
                 state[f'total_trays_sold_{sec}'] = 0
             # everytime there is a new buyer, we will add a new field total_earned_other_buyer_name
 
-            state['week_trays_sold_earned'] = {'0': {
+            state['week_trays_sold_earned'] = {'1654992000': {
                 'trays_sold': 0,
                 'earned': 0,
                 f'earned_{sections[0]}': 0,
@@ -1114,7 +1498,7 @@ def initialise():
                 f'trays_sold_{sections[3]}': 0, # earned_other_buyer_name added whenever
                 }
             }
-            state['month_trays_sold_earned'] = {'0': {
+            state['month_trays_sold_earned'] = {'1656806400': {
                 'trays_sold': 0,
                 'earned': 0,
                 f'earned_{sections[0]}': 0,
@@ -1127,7 +1511,7 @@ def initialise():
                 f'trays_sold_{sections[3]}': 0, # earned_other_buyer_name added whenever
                 }
             }
-            state['change_week'] = {'0': {
+            state['change_week'] = {'1654992000': {
                 'change_trays_sold': 0,
                 'change_earned': 0,
                 f'change_earned_{sections[0]}': 0,
@@ -1140,7 +1524,7 @@ def initialise():
                 f'change_trays_sold_{sections[3]}': 0, # earned_other_buyer_name added whenever
                 }
             }
-            state['change_month'] = {'0': {
+            state['change_month'] = {'1656806400': {
                 'change_trays_sold': 0,
                 'change_earned': 0,
                 f'change_earned_{sections[0]}': 0,
@@ -1161,9 +1545,10 @@ def initialise():
             sections = ['feeds', 'drugs', 'other', 'purity']
             for sec in sections:
                 state[f'total_spent_{sec}'] = 0
+                state[f'total_items_bought_{sec}'] = 0
             # everytime there is a new buyer, we will add a new field total_earned_other_buyer_name
 
-            state['week_items_bought_spent'] = {'0': {
+            state['week_items_bought_spent'] = {'1654992000': {
                 'items_bought': 0,
                 'spent': 0,
                 f'spent_{sections[0]}': 0,
@@ -1176,7 +1561,7 @@ def initialise():
                 f'items_bought_{sections[3]}': 0, # earned_other_buyer_name added whenever
                 }
             }
-            state['month_items_bought_spent'] = {'0': {
+            state['month_items_bought_spent'] = {'1656806400': {
                 'items_bought': 0,
                 'spent': 0,
                 f'spent_{sections[0]}': 0,
@@ -1189,7 +1574,7 @@ def initialise():
                 f'items_bought_{sections[3]}': 0, # earned_other_buyer_name added whenever
                 }
             }
-            state['change_week'] = {'0': {
+            state['change_week'] = {'1654992000': {
                 'change_items_bought': 0,
                 'change_spent': 0,
                 f'change_spent_{sections[0]}': 0,
@@ -1202,7 +1587,7 @@ def initialise():
                 f'change_items_bought_{sections[3]}': 0, # earned_other_buyer_name added whenever
                 }
             }
-            state['change_month'] = {'0': {
+            state['change_month'] = {'1656806400': {
                 'change_items_bought': 0,
                 'change_spent': 0,
                 f'change_spent_{sections[0]}': 0,
@@ -1220,7 +1605,9 @@ def initialise():
             state['total_dead'] = 0
         
         elif name == 'trades':
-            state['balances'] = cache_accounts
+            def f(v):
+                return float(v)
+            state['balances'] = {k: f(v) for k, v in cache_accounts.items()}
 
 
         collection_ref.document('state').set(state)
@@ -1234,8 +1621,8 @@ def initialise():
         f'root_{all_collections[2]}': '',
         f'root_{all_collections[3]}': '',
         f'root_{all_collections[4]}': '',
-        'week_laying_percent': {'0': {}},
-        'month_laying_percent': {'0': {}},
+        'week_laying_percent': {'1654992000': {}},
+        'month_laying_percent': {'1656806400': {}},
         'week_profit': {'0': 0 },
         'month_profit': {'0': 0 },
         'available_to_withdraw': {},  # users will be added here once trade state is updated with an account
@@ -1244,12 +1631,13 @@ def initialise():
     }
     sections = ['total', 'a1','a2', 'b1', 'b2', 'c1', 'c2', 'house']
     for sec in sections:
-        world_state['week_laying_percent']['0'][f'{sec}'] = 0
-        world_state['month_laying_percent']['0'][f'{sec}'] = 0
+        world_state['week_laying_percent']['1654992000'][f'{sec}'] = 0
+        world_state['month_laying_percent']['1656806400'][f'{sec}'] = 0
     
     global_state_ref.document('main').set(world_state)
     collection_ref.document('prev_states').set({'0': state })
 
+# initialise()
 
 inst_mapping = {
     str(PUSH): push,
@@ -1259,11 +1647,13 @@ inst_mapping = {
     str(SUB): sub,
     str(DIV): div,
     str(EQ): eq,
+    str(LT): lt,
+    str(GT): gt,
+    str(PANIC): panic,
     str(SWAP): swap,
     str(ISZERO): is_zero,
     str(STOP): stop,
-    str(TXVALSHASH): tx_values_to_hash,
-    str(COLLHASH): collection_hashes_to_hash,
+    str(BALANCE): balance,
     str(ROOTHASH): root_hash,
     str(SHA256): sha256,
     str(UPDATECACHE): update_cache,
@@ -1273,7 +1663,11 @@ inst_mapping = {
     str(CADDR): create_address,
     str(DADDR): delete_address,
     str(DENTRY): delete_entry,
-    str(NOW): timestamp_now
+    str(NOW): timestamp_now,
+    str(CALCSTATE): full_calculate_new_state,
+    str(MLOAD): mload,
+    str(MSTORE): mstore,
+    str(CALCROOTHASH): calculate_root_hash
 }
 
 

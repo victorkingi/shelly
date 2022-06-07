@@ -18,7 +18,7 @@ class VM:
         self.memory = {}
         self.pc = 0             # program counter
         self.cache_state = {}
-        self.cache_accounts = {'BLACK_HOLE': sys.maxsize} # main money supplier
+        self.cache_accounts = {'BLACK_HOLE': Decimal(sys.maxsize)} # main money supplier
         self.analysed_code = {}
         self.is_safe = self.check_safety()
 
@@ -55,7 +55,7 @@ class VM:
             case opcodes.STOP:
                 return True
             case opcodes.ROOTHASH:
-                return self.stack.size() > 0 and isinstance(self.stack.peek(), str)
+                return self.stack.size() > 0 and isinstance(self.stack.peek(), str) and self.stack.peek() in EVENTC.values()
             case opcodes.SHA256:
                 # lowest case in a sha512 is 1 element needed, hence, stack size of 2
                 if self.stack.size() < 2:
@@ -71,7 +71,7 @@ class VM:
             case opcodes.EQ:
                 return self.stack.size() > 1 and ((isinstance(self.stack.peek(), str) and isinstance(self.stack.peek2(), str)) or (isinstance(self.stack.peek(), Decimal) and isinstance(self.stack.peek2(), Decimal)))
             case opcodes.COLLHASH:
-                return self.stack.size() > 0 and isinstance(self.stack.peek(), str)
+                return self.stack.size() > 0 and isinstance(self.stack.peek(), str) and self.stack.peek() in EVENTC.values()
             case opcodes.TXVALSHASH:
                 if self.stack.size() > 1 and isinstance(self.stack.peek(), str) and isinstance(self.stack.peek2(), str):
                     # check if valid hash
@@ -85,9 +85,9 @@ class VM:
                 
                 return False
             case opcodes.STATE:
-                return self.stack.size() > 0 and isinstance(self.stack.peek(), str)
+                return self.stack.size() > 0 and isinstance(self.stack.peek(), str) and self.stack.peek() in EVENTC.values()
             case opcodes.UPDATECACHE:
-                return self.stack.size() > 0 and isinstance(self.stack.peek(), str)
+                return self.stack.size() > 0 and isinstance(self.stack.peek(), str) and self.stack.peek() in EVENTC.values()
             case opcodes.NOW:
                 return True
             case opcodes.SWAP:
@@ -144,7 +144,7 @@ class VM:
                                     log.warning(f"Invalid buyer name provided, {values[5]}")
                                     return False
                                 
-                                if values[7] in ["THIKAFARMERS", "CAKES", "DUKA"]:
+                                if values[7] in ["THIKAFARMERS", "CAKES", "DUKA"] and values[5] != values[7]:
                                     for idx, x in enumerate(self.stack.get_stack()):
                                         if x == values[5]:
                                             self.stack.replace(idx, values[7])
@@ -240,6 +240,14 @@ class VM:
                                 if not is_valid_hash:
                                     log.warning(f"Invalid hash provided, {to_check_hash}")
                                     return False
+                                
+                                if values[8] not in ["DEAD", "SICK"]:
+                                    log.warning(f"Invalid section provided for dead sick entry, {values[8]}")
+                                    return False
+
+                                if values[9] not in ["HOUSE", "CAGE"]:
+                                    log.warning(f"Invalid location provided for dead sick entry, {values[9]}")
+                                    return False
 
                                 return True
                             else:
@@ -327,12 +335,12 @@ class VM:
                                 log.warning(f"reduced bool list not True but {res} of type {type(res)}")
                                 return False
 
-                        log.warning(f"stack size not 9 or greater but {self.stack.size()}")
+                        log.warning(f"stack size not 10 or greater but {self.stack.size()}")
                         return False
                     case _:
                         return False
             case opcodes.DENTRY:
-                return self.stack.size() > 1 and isinstance(self.stack.peek(), str) and isinstance(self.stack.peek2(), str)
+                return self.stack.size() > 1 and isinstance(self.stack.peek(), str) and isinstance(self.stack.peek2(), str) and self.stack.peek2() in EVENTC.values()
             case opcodes.PREPFINALISE:
                 new_l = [x for x in self.stack.get_stack() if isinstance(x, str)]
                 if len(new_l) == 0:
@@ -340,6 +348,35 @@ class VM:
                 
                 res = reduce(lambda a, b: a and b, new_l)
                 return isinstance(res, bool) and res
+            case opcodes.CALCSTATE:
+                return self.stack.size() > 0 and isinstance(self.stack.peek(), str) and self.stack.peek() in EVENTC.values()
+            case opcodes.MSTORE:
+                return self.stack.size() > 0
+            case opcodes.MLOAD:
+                return self.stack.size() > 0
+            case opcodes.LT:
+               return self.stack.size() > 1 and type(self.stack.peek()) == type(self.stack.peek2())
+            case opcodes.GT:
+               return self.stack.size() > 1 and type(self.stack.peek()) == type(self.stack.peek2())
+            case opcodes.PANIC:
+                return self.stack.size() > 0 and isinstance(self.stack.peek(), Decimal)
+            case opcodes.BALANCE:
+                return self.stack.size() > 0 and isinstance(self.stack.peek(), str)
+            case opcodes.CALCROOTHASH:
+                return self.stack.size() > 0 and isinstance(self.stack.peek(), str)
+            case opcodes.UPROOTHASH:
+                if self.stack.size() > 0 and isinstance(self.stack.peek(), str):
+                    is_valid_hash = re.search("^[a-f0-9]{64}$", self.stack.peek())
+
+                    if not is_valid_hash:
+                        log.warning(f"Invalid hash provided for root hash, {to_check_hash}")
+                        return False
+
+                    return self.stack.size() > 1 and isinstance(self.stack.peek2(), str) and self.stack.peek2() in EVENTC.values()
+
+            case _:
+                log.warning("Invalid opcode provided")
+                return False
 
 
     def execute(self):
