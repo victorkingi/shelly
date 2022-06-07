@@ -8,7 +8,7 @@ import opcodes
 from log_ import log
 from stack import Stack
 from instructions import inst_mapping
-from constants import VALID_BUY_SECTIONS, VALID_SELL_SECTIONS, VALID_BUYERS
+from constants import *
 
 
 class VM:
@@ -24,7 +24,7 @@ class VM:
 
 
     def check_safety(self):
-        return isinstance(self.code, list) and len(self.code) > 1
+        return isinstance(self.code, list) and len(self.code) > 0
     
 
     def is_instr_safe(self, instr, elem=None):
@@ -70,24 +70,10 @@ class VM:
                 return self.stack.size() > 0 and isinstance(self.stack.peek(), Decimal) 
             case opcodes.EQ:
                 return self.stack.size() > 1 and ((isinstance(self.stack.peek(), str) and isinstance(self.stack.peek2(), str)) or (isinstance(self.stack.peek(), Decimal) and isinstance(self.stack.peek2(), Decimal)))
-            case opcodes.COLLHASH:
-                return self.stack.size() > 0 and isinstance(self.stack.peek(), str) and self.stack.peek() in EVENTC.values()
-            case opcodes.TXVALSHASH:
-                if self.stack.size() > 1 and isinstance(self.stack.peek(), str) and isinstance(self.stack.peek2(), str):
-                    # check if valid hash
-                    to_check_hash = self.stack.peek()
-                    is_valid_hash = re.search("^[a-f0-9]{64}$", to_check_hash)
-
-                    if not is_valid_hash:
-                        log.warning(f"Invalid hash provided, {to_check_hash}")
-                        return False
-                    return True
-                
-                return False
             case opcodes.STATE:
                 return self.stack.size() > 0 and isinstance(self.stack.peek(), str) and self.stack.peek() in EVENTC.values()
             case opcodes.UPDATECACHE:
-                return self.stack.size() > 0 and isinstance(self.stack.peek(), str) and self.stack.peek() in EVENTC.values()
+                return self.stack.size() > 0 and isinstance(self.stack.peek(), str) and (self.stack.peek() in EVENTC.values() or self.stack.peek() == 'world_state')
             case opcodes.NOW:
                 return True
             case opcodes.SWAP:
@@ -372,8 +358,9 @@ class VM:
                         log.warning(f"Invalid hash provided for root hash, {to_check_hash}")
                         return False
 
-                    return self.stack.size() > 1 and isinstance(self.stack.peek2(), str) and self.stack.peek2() in EVENTC.values()
-
+                    return self.stack.size() > 1 and isinstance(self.stack.peek2(), str) and (self.stack.peek2() in EVENTC.values() or self.stack.peek2() == 'main')
+            case opcodes.CALCMAINSTATE:
+                return True
             case _:
                 log.warning("Invalid opcode provided")
                 return False

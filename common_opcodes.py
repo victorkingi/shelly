@@ -13,7 +13,13 @@ def create_sale_instructions(values={
   
     instr = [
         [PUSH, 'sales'],
+        [PUSH, 'purchases'],
         [PUSH, 'trades'],
+        [PUSH, 'world_state'],
+        [PUSH, 'eggs_collected'],
+        [UPDATECACHE],
+        [UPDATECACHE],
+        [UPDATECACHE],
         [UPDATECACHE],
         [UPDATECACHE],
         [PUSH, values['tray_no']],
@@ -91,9 +97,30 @@ def create_sale_instructions(values={
         [CENTRY],
 
         [PUSH, 'sales'],
+        [PUSH, 1],
+        [DUP],
+        [PUSH, 1],
+        [DUP],
+        [CALCSTATE],
+        [CALCROOTHASH],
+        [SHA256],
+        [UPROOTHASH],
+
         [PUSH, 'trades'],
+        [PUSH, 1],
+        [DUP],
+        [PUSH, 1],
+        [DUP],
         [CALCSTATE],
-        [CALCSTATE],
+        [CALCROOTHASH],
+        [SHA256],
+        [UPROOTHASH],
+
+        [CALCMAINSTATE],
+        [SHA256],
+        [PUSH, 'main'],
+        [SWAP],
+        [UPROOTHASH],
         [STOP]
             ]
     flattened_code = [item for sublist in instr for item in sublist]
@@ -238,12 +265,16 @@ def create_buy_instructions(values={
         [PUSH, 'trades'],
         [PUSH, 1],
         [DUP],
+        [PUSH, 1],
+        [DUP],
         [CALCSTATE],
         [CALCROOTHASH],
         [SHA256],
         [UPROOTHASH],
 
         [PUSH, 'purchases'],
+        [PUSH, 1],
+        [DUP],
         [PUSH, 1],
         [DUP],
         [CALCSTATE],

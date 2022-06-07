@@ -27,7 +27,11 @@ db = firestore.client()
 
 NBO = tz.gettz('Africa/Nairobi')
 
-cache_state = { 
+cache_state = {
+    'world_state': {
+        'main': {},
+        'prev_states': {}
+    },
     'sales': {
         'state': {
             'root_hash': '',
@@ -462,6 +466,16 @@ def update_cache(stack=None, memory=None, pc=None, analysed=None):
         return None, None, None, None, None
     
     collection_ref = db.collection(collection_name)
+
+    if collection_name == 'world_state':
+        state_dict = collection_ref.document('main').get().to_dict()
+        cache_state['world_state']['main'] = state_dict
+        state_dict = collection_ref.document('prev_states').get().to_dict()
+        cache_state['world_state']['prev_states'] = state_dict
+        log.debug("Updated main state")
+        return stack, memory, pc, cache_state, cache_accounts
+
+
     state_dict = collection_ref.document('state').get().to_dict()
 
     if state_dict is None:
@@ -1442,7 +1456,91 @@ def update_root_hash(stack=None, memory=None, pc=None, analysed=None):
 
     hash = stack.pop()
     collection_name = stack.pop()
-    cache_state[collection_name]['root_hash'] = hash
+    if collection_name != 'main':
+        cache_state[collection_name]['state']['root_hash'] = hash
+        log.debug(f"New state: {cache_state[collection_name]['state']}")
+        return stack, memory, pc, cache_state, cache_accounts
+    else:
+        cache_state['world_state']['main']['root'] = hash   
+        log.debug(f"New main state: {cache_state['world_state']['main']}")
+        return stack, memory, pc, cache_state, cache_accounts
+
+
+def calculate_main_state(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: CALCMAINSTATE")
+    pc += 1
+
+    net_profit = Decimal(cache_state['sales']['state']['total_earned']) - Decimal(cache_state['purchases']['state']['total_spent'])
+    week_profit = {}
+    month_profit = {}
+    for k in cache_state['sales']['state']['week_trays_sold_earned']:
+        spent = cache_state['purchases']['state']['week_items_bought_spent'][k]['spent']
+        sold = cache_state['sales']['state']['week_trays_sold_earned'][k]['earned']
+        net = Decimal(sold) - Decimal(spent)
+        week_profit[k] = net
+    
+    for k in cache_state['sales']['state']['month_trays_sold_earned']:
+        spent = cache_state['purchases']['state']['month_items_bought_spent'][k]['spent']
+        sold = cache_state['sales']['state']['month_trays_sold_earned'][k]['earned']
+        net = Decimal(sold) - Decimal(spent)
+        month_profit[k] = net
+    
+    if net_profit > 0:
+        # TODO add a check for any withdraws that have ever happened, subtract it from this
+        cache_state['world_state']['main']['available_to_withdraw']['JEFF'] = Decimal('0.05') * net_profit 
+        cache_state['world_state']['main']['available_to_withdraw']['VICTOR'] = Decimal('0.05') * net_profit 
+        cache_state['world_state']['main']['available_to_withdraw']['BABRA'] = Decimal('0.05') * net_profit 
+
+
+    total_birds = cache_state['world_state']['main']['total_birds']
+    world_state = cache_state['world_state']['main']
+    total_birds = Decimal(total_birds)
+
+
+    current_week = cache_state['eggs_collected']['state']['week_trays_and_exact'].keys()
+    current_month = cache_state['eggs_collected']['state']['month_trays_and_exact'].keys()
+    week_in_seconds = 7 * 24 * 60 * 60
+    week_in_seconds = Decimal(week_in_seconds)
+    month_in_seconds = 28 * 24 * 60 * 60
+    month_in_seconds = Decimal(month_in_seconds)
+
+    if current_week:
+        current_week = Decimal(max(current_week))
+        temp = str(current_week)
+        current_week -= week_in_seconds
+        current_week = str(current_week)
+        if current_week not in cache_state['eggs_collected']['state']['week_trays_and_exact']:
+            current_week = temp
+    else:
+        log.error("Current week does not exist in eggs_collected")
+        return None, None, None, None, None
+    
+    if current_month:
+        current_month = Decimal(max(current_month))
+        temp = str(current_month)
+        current_month -= month_in_seconds
+        current_month = str(current_month)
+        if current_month not in cache_state['eggs_collected']['state']['month_trays_and_exact']:
+            current_month = temp
+    else:
+        log.error("Current month does not exist in eggs_collected")
+        return None, None, None, None, None
+    
+    amount_eggs_week = cache_state['eggs_collected']['state']['week_trays_and_exact'][current_week]['trays_collected']
+    amount_eggs_week = get_eggs(amount_eggs_week)[1]
+    amount_eggs_month = cache_state['eggs_collected']['state']['month_trays_and_exact'][current_month]['trays_collected']
+    amount_eggs_month = get_eggs(amount_eggs_month)[1]
+
+  
+    cache_state['world_state']['main']['week_laying_percent'][current_week] = amount_eggs_week / Decimal(total_birds)
+    cache_state['world_state']['main']['month_laying_percent'][current_month] = amount_eggs_month / Decimal(total_birds)
+    cache_state['world_state']['main']['total_profit'] = net_profit
+    cache_state['world_state']['main']['week_profit'] = week_profit
+    cache_state['world_state']['main']['month_profit'] = month_profit
+    to_hash_list = [v['root_hash'] for x in cache_state for y, v in cache_state[x].items() if x != 'world_state' and y == 'state']
+    stack.push(to_hash_list)
+    stack.push(Decimal(len(to_hash_list)))
+
     return stack, memory, pc, cache_state, cache_accounts
 
 
@@ -1462,6 +1560,8 @@ def initialise():
     print("initialising...")
     all_collections = []
     for name in cache_state:
+        if name == 'world_state':
+            continue
         all_collections.append(name)
         collection_ref = db.collection(name)
         state = cache_state[name]['state']
@@ -1620,28 +1720,21 @@ def initialise():
     
     global_state_ref = db.collection('world_state')
     world_state = {
-        f'root_{all_collections[0]}': '',
-        f'root_{all_collections[1]}': '',
-        f'root_{all_collections[2]}': '',
-        f'root_{all_collections[3]}': '',
-        f'root_{all_collections[4]}': '',
         'week_laying_percent': {'1654992000': {}},
         'month_laying_percent': {'1656806400': {}},
         'week_profit': {'0': 0 },
         'month_profit': {'0': 0 },
-        'available_to_withdraw': {},  # users will be added here once trade state is updated with an account
-        'net_user_income': {'total': 0}, # this will never be final i.e. a change could happen in the state after a withdraw leading to negative amount
-        'age_of_birds': {'start_date': {'unix': 0, 'locale': ''}, 'age': {'unix': 0, 'years': 0, 'months': 0, 'weeks': 0 }}
+        'total_profit': 0,
+        'available_to_withdraw': {'VICTOR': 0, 'BABRA': 0, 'JEFF': 0},
+        'age_of_birds': {'start_date': {'unix': 0, 'locale': ''}, 'age': {'unix': 0, 'years': 0, 'months': 0, 'weeks': 0 }},
+        'total_birds': 1, # divide by zero error
+        'root': ''
     }
-    sections = ['total', 'a1','a2', 'b1', 'b2', 'c1', 'c2', 'house']
-    for sec in sections:
-        world_state['week_laying_percent']['1654992000'][f'{sec}'] = 0
-        world_state['month_laying_percent']['1656806400'][f'{sec}'] = 0
     
     global_state_ref.document('main').set(world_state)
     collection_ref.document('prev_states').set({'0': state })
 
-# initialise()
+#initialise()
 
 inst_mapping = {
     str(PUSH): push,
@@ -1671,7 +1764,9 @@ inst_mapping = {
     str(CALCSTATE): full_calculate_new_state,
     str(MLOAD): mload,
     str(MSTORE): mstore,
-    str(CALCROOTHASH): calculate_root_hash
+    str(CALCROOTHASH): calculate_root_hash,
+    str(UPROOTHASH): update_root_hash,
+    str(CALCMAINSTATE): calculate_main_state
 }
 
 
