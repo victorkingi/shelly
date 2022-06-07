@@ -235,13 +235,22 @@ def create_buy_instructions(values={
         [PUSH, 'TRADE'],
         [CENTRY],
 
-        [PUSH, 'purchases'],
         [PUSH, 'trades'],
-        [PUSH, 'purchases'],
-        [CALCSTATE],
+        [PUSH, 1],
+        [DUP],
         [CALCSTATE],
         [CALCROOTHASH],
         [SHA256],
+        [UPROOTHASH],
+
+        [PUSH, 'purchases'],
+        [PUSH, 1],
+        [DUP],
+        [CALCSTATE],
+        [CALCROOTHASH],
+        [SHA256],
+        [UPROOTHASH],
+
         [STOP]
     ]
     flattened_code = [item for sublist in instr for item in sublist]

@@ -1440,7 +1440,11 @@ def update_root_hash(stack=None, memory=None, pc=None, analysed=None):
     log.debug(f"{pc}: UPROOTHASH")
     pc += 1
 
-    
+    hash = stack.pop()
+    collection_name = stack.pop()
+    cache_state[collection_name]['root_hash'] = hash
+    return stack, memory, pc, cache_state, cache_accounts
+
 
 def balance(stack=None, memory=None, pc=None, analysed=None):
     log.debug(f"{pc}: BALANCE")
