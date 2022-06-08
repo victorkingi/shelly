@@ -12,7 +12,7 @@ valid_strings = ['SELL', 'TRADE', 'BUY', 'DS', 'EGGS', 'purchases', 'eggs_collec
 @atheris.instrument_func
 def TestVM(input_bytes):
   fdp = atheris.FuzzedDataProvider(input_bytes)
-  input_list = fdp.ConsumeIntListInRange(50, 0, 30)
+  input_list = fdp.ConsumeIntListInRange(1000, 0, 30)
   rand_list = []
   for i in range(int(len(input_list)*0.2)):
     n = random.randint(0, len(input_list)-1)

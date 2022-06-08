@@ -18,7 +18,7 @@ class VM:
         self.memory = {}
         self.pc = 0             # program counter
         self.cache_state = {}
-        self.cache_accounts = {'BLACK_HOLE': Decimal(sys.maxsize)} # main money supplier
+        self.cache_accounts = {'BLACK_HOLE': Decimal(MAX_EMAX) } # main money supplier
         self.analysed_code = {}
         self.is_safe = self.check_safety()
 
@@ -80,7 +80,7 @@ class VM:
                 # can swap a decimal with a string
                 return self.stack.size() > 1
             case opcodes.CADDR:
-                return self.stack.size() > 1 and isinstance(self.stack.peek(), str) and isinstance(self.stack.peek2(), Decimal)
+                return self.stack.size() > 0 and isinstance(self.stack.peek(), str)
             case opcodes.DADDR:
                 return self.stack.size() > 0 and isinstance(self.stack.peek(), str)
             case opcodes.CENTRY:

@@ -18,7 +18,9 @@ def get_eggs_diff(val1, val2):
         res = val1-val2
         res_str = res/eggs_in_tray
         res_trays = int(res_str)
-        return f'{res_trays},{(res_str-res_trays)*eggs_in_tray}', res
+        eggs_left = (res_str-res_trays)*eggs_in_tray
+        eggs_left = Decimal(f'{eggs_left}')
+        return f'{res_trays},{round(eggs_left)}', res
 
     if isinstance(val1, str) and isinstance(val2, Decimal):
         val1 = val1.split(',')
@@ -26,7 +28,9 @@ def get_eggs_diff(val1, val2):
         res = val1-val2
         res_str = res/eggs_in_tray
         res_trays = int(res_str)
-        return f'{res_trays},{(res_str-res_trays)*eggs_in_tray}', res
+        eggs_left = (res_str-res_trays)*eggs_in_tray
+        eggs_left = Decimal(f'{eggs_left}')
+        return f'{res_trays},{round(eggs_left)}', res
 
     if isinstance(val1, Decimal) and isinstance(val2, str):
         val2 = val2.split(',')
@@ -34,13 +38,17 @@ def get_eggs_diff(val1, val2):
         res = val1-val2
         res_str = res/eggs_in_tray
         res_trays = int(res_str)
-        return f'{res_trays},{(res_str-res_trays)*eggs_in_tray}', res
+        eggs_left = (res_str-res_trays)*eggs_in_tray
+        eggs_left = Decimal(f'{eggs_left}')
+        return f'{res_trays},{round(eggs_left)}', res
 
     if isinstance(val1, Decimal) and isinstance(val2, Decimal):
         res = val1-val2
         res_str = res/eggs_in_tray
         res_trays = int(res_str)
-        return f'{res_trays},{(res_str-res_trays)*eggs_in_tray}', res
+        eggs_left = (res_str-res_trays)*eggs_in_tray
+        eggs_left = Decimal(f'{eggs_left}')
+        return f'{res_trays},{round(eggs_left)}', res
     
     log.error(f"Failed to subtract eggs, got unknown types, {type(val1)}, {type(val2)}")
     return None, None
@@ -50,7 +58,9 @@ def get_eggs(amount):
     if isinstance(amount, Decimal):
         res_str = amount/eggs_in_tray
         res_trays = int(res_str)
-        return f'{res_trays},{(res_str-res_trays)*eggs_in_tray}', amount
+        eggs_left = (res_str-res_trays)*eggs_in_tray
+        eggs_left = Decimal(f'{eggs_left}')
+        return f'{res_trays},{round(eggs_left)}', amount
 
     if isinstance(amount, str):
         res = amount.split(',')
@@ -70,7 +80,9 @@ def increment_eggs(val1, val2):
         res = val1+val2
         res_str = res/eggs_in_tray
         res_trays = int(res_str)
-        return f'{res_trays},{(res_str-res_trays)*eggs_in_tray}', res
+        eggs_left = (res_str-res_trays)*eggs_in_tray
+        eggs_left = Decimal(f'{eggs_left}')
+        return f'{res_trays},{round(eggs_left)}', res
 
     if isinstance(val1, str) and isinstance(val2, Decimal):
         val1 = val1.split(',')
@@ -78,7 +90,9 @@ def increment_eggs(val1, val2):
         res = val1+val2
         res_str = res/eggs_in_tray
         res_trays = int(res_str)
-        return f'{res_trays},{(res_str-res_trays)*eggs_in_tray}', res
+        eggs_left = (res_str-res_trays)*eggs_in_tray
+        eggs_left = Decimal(f'{eggs_left}')
+        return f'{res_trays},{round(eggs_left)}', res
 
     if isinstance(val1, Decimal) and isinstance(val2, str):
         val2 = val2.split(',')
@@ -86,13 +100,17 @@ def increment_eggs(val1, val2):
         res = val1+val2
         res_str = res/eggs_in_tray
         res_trays = int(res_str)
-        return f'{res_trays},{(res_str-res_trays)*eggs_in_tray}', res
+        eggs_left = (res_str-res_trays)*eggs_in_tray
+        eggs_left = Decimal(f'{eggs_left}')
+        return f'{res_trays},{round(eggs_left)}', res
 
     if isinstance(val1, Decimal) and isinstance(val2, Decimal):
         res = val1+val2
         res_str = res/eggs_in_tray
         res_trays = int(res_str)
-        return f'{res_trays},{(res_str-res_trays)*eggs_in_tray}', res
+        eggs_left = (res_str-res_trays)*eggs_in_tray
+        eggs_left = Decimal(f'{eggs_left}')
+        return f'{res_trays},{round(eggs_left)}', res
     
     log.error(f"Failed to increment eggs, got unknown types, {type(val1)}, {type(val2)}")
     return None, None
