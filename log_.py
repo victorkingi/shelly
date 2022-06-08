@@ -1,9 +1,4 @@
 import logging
-import os
-
-if os.path.exists("vm.log"):
-    os.remove("vm.log")
-    print("cleaned log file")
 
 
 FMT = "[{levelname:^9}] {asctime} {name}: {message}"

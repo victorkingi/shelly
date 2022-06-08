@@ -3,6 +3,7 @@ from functools import reduce
 from decimal import *
 import re
 import sys
+import os
 
 import opcodes
 from log_ import log
@@ -14,10 +15,116 @@ from constants import *
 class VM:
     def __init__(self, code_=[]):
         self.code = code_
+        self.log_file = 'vm.log'
         self.stack = Stack()
         self.memory = {}
         self.pc = 0             # program counter
-        self.cache_state = {}
+        self.cache_state = {
+            'world_state': {
+                'main': {},
+                'prev_states': {}
+            },
+            'sales': {
+                'state': {
+                    'root_hash': '',
+                    'all_tx_hashes': {},
+                    'prev_3_states': {'0': {
+                        'op': '',
+                        'tx_hash': '',
+                        'submitted_on': {'unix': 0, 'locale': ''}
+                    }, '1': {
+                        'op': '',
+                        'tx_hash': '',
+                        'submitted_on': {'unix': 0, 'locale': ''}
+                    }, '2': {
+                        'op': '',
+                        'tx_hash': '',
+                        'submitted_on': {'unix': 0, 'locale': ''}
+                    }}
+                },
+                'prev_states': {}
+            },
+            'purchases': {
+                'state': {
+                    'root_hash': '',
+                    'all_tx_hashes': {},
+                    'prev_3_states': {'0': {
+                        'op': '',
+                        'tx_hash': '',
+                        'submitted_on': {'unix': 0, 'locale': ''}
+                    }, '1': {
+                        'op': '',
+                        'tx_hash': '',
+                        'submitted_on': {'unix': 0, 'locale': ''}
+                    }, '2': {
+                        'op': '',
+                        'tx_hash': '',
+                        'submitted_on': {'unix': 0, 'locale': ''}
+                    }}
+                },
+                'prev_states': {}
+            },
+            'eggs_collected': {
+                'state': {
+                    'root_hash': '',
+                    'all_tx_hashes': {},
+                    'prev_3_states': {'0': {
+                        'op': '',
+                        'tx_hash': '',
+                        'submitted_on': {'unix': 0, 'locale': ''}
+                    }, '1': {
+                        'op': '',
+                        'tx_hash': '',
+                        'submitted_on': {'unix': 0, 'locale': ''}
+                    }, '2': {
+                        'op': '',
+                        'tx_hash': '',
+                        'submitted_on': {'unix': 0, 'locale': ''}
+                    }}
+                },
+                'prev_states': {}
+            },
+            'dead_sick': {
+            'state': {
+                    'root_hash': '',
+                    'all_tx_hashes': {},
+                    'prev_3_states': {'0': {
+                        'op': '',
+                        'tx_hash': '',
+                        'submitted_on': {'unix': 0, 'locale': ''}
+                    }, '1': {
+                        'op': '',
+                        'tx_hash': '',
+                        'submitted_on': {'unix': 0, 'locale': ''}
+                    }, '2': {
+                        'op': '',
+                        'tx_hash': '',
+                        'submitted_on': {'unix': 0, 'locale': ''}
+                    }}
+                },
+                'prev_states': {}
+            },
+            'trades': {
+                'state': {
+                    'root_hash': '',
+                    'all_tx_hashes': {},
+                    'prev_3_states': {'0': {
+                        'op': '',
+                        'tx_hash': '',
+                        'submitted_on': {'unix': 0, 'locale': ''}
+                    }, '1': {
+                        'op': '',
+                        'tx_hash': '',
+                        'submitted_on': {'unix': 0, 'locale': ''}
+                    }, '2': {
+                        'op': '',
+                        'tx_hash': '',
+                        'submitted_on': {'unix': 0, 'locale': ''}
+                    }}
+                },
+                'prev_states': {}
+            }
+        }
         self.cache_accounts = {'BLACK_HOLE': Decimal(MAX_EMAX) } # main money supplier
         self.analysed_code = {}
         self.is_safe = self.check_safety()
@@ -73,7 +180,14 @@ class VM:
             case opcodes.STATE:
                 return self.stack.size() > 0 and isinstance(self.stack.peek(), str) and self.stack.peek() in EVENTC.values()
             case opcodes.UPDATECACHE:
-                return self.stack.size() > 0 and isinstance(self.stack.peek(), str) and (self.stack.peek() in EVENTC.values() or self.stack.peek() == 'world_state')
+                is_valid = self.stack.size() > 0 and isinstance(self.stack.peek(), str) and (self.stack.peek() in EVENTC.values() or self.stack.peek() == 'world_state')
+                if is_valid:
+                    if self.stack.peek() in self.cache_state and self.stack.peek() != 'world_state':
+                        ids = set(self.cache_state[self.stack.peek()].keys())
+                        return 'prev_states' in ids and 'state' in ids
+                    elif self.stack.peek() == 'world_state':
+                        return True
+                return False
             case opcodes.NOW:
                 return True
             case opcodes.SWAP:
@@ -349,28 +463,60 @@ class VM:
             case opcodes.BALANCE:
                 return self.stack.size() > 0 and isinstance(self.stack.peek(), str)
             case opcodes.CALCROOTHASH:
-                return self.stack.size() > 0 and isinstance(self.stack.peek(), str)
+                return self.stack.size() > 0 and isinstance(self.stack.peek(), str) and self.stack.peek() in EVENTC.values()
             case opcodes.UPROOTHASH:
                 if self.stack.size() > 0 and isinstance(self.stack.peek(), str):
                     is_valid_hash = re.search("^[a-f0-9]{64}$", self.stack.peek())
 
                     if not is_valid_hash:
-                        log.warning(f"Invalid hash provided for root hash, {to_check_hash}")
+                        log.warning(f"Invalid hash provided for root hash, {self.stack.peek()}")
                         return False
 
                     return self.stack.size() > 1 and isinstance(self.stack.peek2(), str) and (self.stack.peek2() in EVENTC.values() or self.stack.peek2() == 'main')
             case opcodes.CALCMAINSTATE:
-                #cache_state['sales']['state']['total_earned']
-                total_earned_exists = [x for k in self.cache_state for _k in self.cache_state[k] for __k in self.cache_state[k][_k] if EVENTC[SELL] == k and 'state' == _k and __k == 'total_earned']
-                total_spent_exists = [x for k in self.cache_state for _k in self.cache_state[k] for __k in self.cache_state[k][_k] if EVENTC[BUY] == k and 'state' == _k and __k == 'total_spent']
-                return not not total_earned_exists and not not total_spent_exists
+                total_earned_exists = ['total_earned' in v for k in self.cache_state for _k, v in self.cache_state[k].items() if EVENTC[SELL] == k and 'state' == _k]
+                total_spent_exists = ['total_spent' in v for k in self.cache_state for _k, v in self.cache_state[k].items() if EVENTC[BUY] == k and 'state' == _k]
+                total_birds_exists = ['total_birds' in v for k in self.cache_state for _k, v in self.cache_state[k].items() if 'world_state' == k and 'main' == _k]
+                is_len_valid = len(total_earned_exists) == len(total_spent_exists) == len(total_birds_exists) == 1
+                return is_len_valid and total_earned_exists[0] and total_spent_exists[0] and total_birds_exists[0]
             case _:
                 log.warning("Invalid opcode provided")
                 return False
 
+    # silently clears log
+    def clear_log(self):
+        file_ = self.log_file
+        log.info("Clearing log...")
+
+        if os.path.exists(file_):
+            lookup = 'VM-execution: execution success'
+            last_suc = -1
+
+            with open(file_) as myFile:
+                for num, line in enumerate(myFile, 1):
+                    if lookup in line:
+                        last_suc = num
+
+            size = os.path.getsize(file_)
+            if last_suc == -1:
+                return 0
+
+            if size/(1024 * 1024) > 10:
+                lines = []
+                with open(file_, 'r') as fp:
+                    lines = fp.readlines()
+
+                with open(file_, 'w') as fp:
+                    # iterate each line
+                    for number, line in enumerate(lines):
+                        if number >= last_suc-1:
+                            fp.write(line)
+                
+                log.info(f'Reduced file size from {round(size/(1024 * 1024), 2)} MB to {round(os.path.getsize(file_)/(1024 * 1024), 2)} MB')
+               
 
     def execute(self):
-        log.debug(f"Code input: {self.code}")
+        log.info(f"Code input: {self.code}")
 
         if not self.is_safe:
             log.error("execution failed, check")
@@ -391,6 +537,10 @@ class VM:
             
             if self.pc == -1:
                 # successful completion
+
+                # reset log with unneccessary data
+                self.clear_log()
+
                 if self.stack.size():
                     # no update was made to firestore, hence just return computed output
                     log.info(f"execution success, result: {self.stack.peek()}")

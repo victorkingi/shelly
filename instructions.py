@@ -408,7 +408,11 @@ def mload(stack=None, memory=None, pc=None, analysed=None):
     pc += 1
 
     key = stack.pop()
-    stack.push(memory[key])
+    if key in memory:
+        stack.push(memory[key])
+    else:
+        log.warning(f"entry {key} not in memory")
+        return None, None, None, None, None
 
     return stack, memory, pc, cache_state, cache_accounts
 
@@ -489,9 +493,6 @@ def get_state(stack=None, memory=None, pc=None, analysed=None):
     pc += 1
 
     collection_name = stack.pop()
-    if not collection_name in cache_state:
-        log.error(f"collection name {collection_name} does not exist")
-        return None, None, None, None, None
     
     collection_ref = db.collection(collection_name)
     state_dict = collection_ref.document('state').get().to_dict()
@@ -525,10 +526,6 @@ def update_cache(stack=None, memory=None, pc=None, analysed=None):
     pc += 1
 
     collection_name = stack.pop()
-
-    if not collection_name in cache_state:
-        log.error(f"collection name {collection_name}, does not exist")
-        return None, None, None, None, None
     
     collection_ref = db.collection(collection_name)
 
@@ -1172,9 +1169,6 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
     pc += 1
 
     collection_name = stack.pop()
-    if not collection_name in cache_state:
-        log.error(f"collection name {collection_name} does not exist")
-        return None, None, None, None, None
 
     week_in_seconds = 7 * 24 * 60 * 60
     week_in_seconds = Decimal(week_in_seconds)
@@ -1486,16 +1480,14 @@ def calculate_root_hash(stack=None, memory=None, pc=None, analysed=None):
     pc += 1
 
     collection_name = stack.pop()
-    if not collection_name in cache_state:
-        log.error(f"collection name {collection_name} does not exist")
-        return None, None, None, None, None
+    
+    full_list_data = []
     
     for id in cache_state[collection_name]:
         if id == 'state' or id == 'prev_states':
             continue
         
         tx = cache_state[collection_name][id]
-        full_list_data = []
 
         for k, v in tx.items():
             if k == 'prev_values':
