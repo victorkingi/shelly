@@ -360,7 +360,10 @@ class VM:
 
                     return self.stack.size() > 1 and isinstance(self.stack.peek2(), str) and (self.stack.peek2() in EVENTC.values() or self.stack.peek2() == 'main')
             case opcodes.CALCMAINSTATE:
-                return True
+                #cache_state['sales']['state']['total_earned']
+                total_earned_exists = [x for k in self.cache_state for _k in self.cache_state[k] for __k in self.cache_state[k][_k] if EVENTC[SELL] == k and 'state' == _k and __k == 'total_earned']
+                total_spent_exists = [x for k in self.cache_state for _k in self.cache_state[k] for __k in self.cache_state[k][_k] if EVENTC[BUY] == k and 'state' == _k and __k == 'total_spent']
+                return not not total_earned_exists and not not total_spent_exists
             case _:
                 log.warning("Invalid opcode provided")
                 return False
