@@ -486,7 +486,6 @@ class VM:
     # silently clears log
     def clear_log(self):
         file_ = self.log_file
-        log.info("Clearing log...")
 
         if os.path.exists(file_):
             lookup = 'VM-execution: execution success'
@@ -502,12 +501,12 @@ class VM:
                 return 0
 
             if size/(1024 * 1024) > 10:
+                log.info(f"found line {last_suc} proceeding with clearing...")
                 lines = []
                 with open(file_, 'r') as fp:
                     lines = fp.readlines()
 
                 with open(file_, 'w') as fp:
-                    # iterate each line
                     for number, line in enumerate(lines):
                         if number >= last_suc-1:
                             fp.write(line)
