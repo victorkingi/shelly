@@ -386,9 +386,6 @@ def mstore(stack=None, memory=None, pc=None, analysed=None):
     pc += 1
 
     elem = stack.pop()
-    if not isinstance(elem, str):
-        log.error(f"expected to store a string but found {type(elem)}")
-        return None, None, None, None, None
 
     is_valid_hash = re.search("^[a-f0-9]{64}$", elem)
     event_keys = EVENTC.keys()
@@ -408,11 +405,7 @@ def mload(stack=None, memory=None, pc=None, analysed=None):
     pc += 1
 
     key = stack.pop()
-    if key in memory:
-        stack.push(memory[key])
-    else:
-        log.warning(f"entry {key} not in memory")
-        return None, None, None, None, None
+    stack.push(memory[key])
 
     return stack, memory, pc, cache_state, cache_accounts
 
@@ -725,12 +718,11 @@ def update_cache(stack=None, memory=None, pc=None, analysed=None):
                     return stack, memory, pc, cache_state, cache_accounts
 
 
-# TODO: replace 1634774400000.0 with time.time()
 def timestamp_now(stack=None, memory=None, pc=None, analysed=None):
     log.debug(f"{pc}: NOW")
     pc += 1
 
-    stack.push(Decimal(1654523316))
+    stack.push(Decimal(time.time()))
     return stack, memory, pc, cache_state, cache_accounts
 
 
@@ -759,12 +751,8 @@ def delete_address(stack=None, memory=None, pc=None, analysed=None):
     pc += 1
 
     address_name = stack.pop()
-    if address_name in cache_accounts:
-        del cache_accounts[address_name]
-        return stack, memory, pc, cache_state, cache_accounts
-    else:
-        log.error("Address does not exist")
-        return None, None, None, None, None
+    del cache_accounts[address_name]
+    return stack, memory, pc, cache_state, cache_accounts
 
 
 def create_entry(stack=None, memory=None, pc=None, analysed=None):

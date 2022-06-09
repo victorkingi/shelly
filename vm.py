@@ -196,7 +196,7 @@ class VM:
             case opcodes.CADDR:
                 return self.stack.size() > 0 and isinstance(self.stack.peek(), str)
             case opcodes.DADDR:
-                return self.stack.size() > 0 and isinstance(self.stack.peek(), str)
+                return self.stack.size() > 0 and isinstance(self.stack.peek(), str) and self.stack.peek() in self.cache_accounts
             case opcodes.CENTRY:
                 first_check = self.stack.size() > 0 and isinstance(self.stack.peek(), str)
                 if not first_check:
@@ -451,9 +451,9 @@ class VM:
             case opcodes.CALCSTATE:
                 return self.stack.size() > 0 and isinstance(self.stack.peek(), str) and self.stack.peek() in EVENTC.values()
             case opcodes.MSTORE:
-                return self.stack.size() > 0
+                return self.stack.size() > 0 and isinstance(self.stack.peek(), str)
             case opcodes.MLOAD:
-                return self.stack.size() > 0
+                return self.stack.size() > 0 and isinstance(self.stack.peek(), str) and self.stack.peek() in self.memory
             case opcodes.LT:
                return self.stack.size() > 1 and type(self.stack.peek()) == type(self.stack.peek2())
             case opcodes.GT:
