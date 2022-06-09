@@ -1,46 +1,52 @@
 # OPCODES
+from enum import Enum, auto
 
-# Main
-PUSH = 0
-DUP = 1
-POP = 2
-SWAP = 3
-NOW = 4
+class AutoName(Enum):
+    def _generate_next_value_(name, start, count, last_values):
+        return count
 
-# arithmetic
-ADD = 5
-MUL = 6
-SUB = 7
-DIV = 8
 
-#Comparison
-LT = 9
-GT = 10
-EQ = 11
-ISZERO = 12
+class Opcodes(AutoName):
+    # Main
+    PUSH = auto()
+    DUP = auto()
+    SWAP = auto()
+    NOW = auto()
 
-# Hash
-SHA256 = 13
-ROOTHASH = 14
+    # arithmetic
+    ADD = auto()
+    MUL = auto()
+    SUB = auto()
+    DIV = auto()
 
-# data manipulation
-CENTRY = 15
-DENTRY = 16
-CADDR = 17
-DADDR = 18
-UPDATECACHE = 19
-STATE = 20
-PREPFINALISE = 21
-CALCSTATE = 22
-CALCROOTHASH = 23
-UPROOTHASH = 24
-CALCMAINSTATE = 25
-BALANCE = 26
+    #Comparison
+    LT = auto()
+    GT = auto()
+    EQ = auto()
+    ISZERO = auto()
 
-# memory
-MLOAD = 27
-MSTORE = 28
+    # Hash
+    SHA256 = auto()
+    ROOTHASH = auto()
 
-# terminate
-STOP = 29
-PANIC = 30
+    # data manipulation
+    CENTRY = auto()
+    DENTRY = auto()
+    CADDR = auto()
+    DADDR = auto()
+    UPDATECACHE = auto()
+    STATE = auto()
+    PREPFINALISE = auto()
+    CALCSTATE = auto()
+    CALCROOTHASH = auto()
+    UPROOTHASH = auto()
+    CALCMAINSTATE = auto()
+    BALANCE = auto()
+
+    # memory
+    MLOAD = auto()
+    MSTORE = auto()
+
+    # terminate
+    STOP = auto()
+    PANIC = auto()

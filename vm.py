@@ -5,7 +5,7 @@ import re
 import sys
 import os
 
-import opcodes
+from opcodes import Opcodes
 from log_ import log
 from stack import Stack
 from instructions import inst_mapping
@@ -136,20 +136,20 @@ class VM:
 
     def is_instr_safe(self, instr, elem=None):
         match instr:
-            case opcodes.PUSH:
+            case Opcodes.PUSH.value:
                 if elem is None:
                     return False
     
                 return True
-            case opcodes.ADD:
+            case Opcodes.ADD.value:
                 return self.stack.size() > 1 and isinstance(self.stack.peek(), Decimal) and isinstance(self.stack.peek2(), Decimal)
-            case opcodes.SUB:
+            case Opcodes.SUB.value:
                 return self.stack.size() > 1 and isinstance(self.stack.peek(), Decimal) and isinstance(self.stack.peek2(), Decimal)
-            case opcodes.MUL:
+            case Opcodes.MUL.value:
                 return self.stack.size() > 1 and isinstance(self.stack.peek(), Decimal) and isinstance(self.stack.peek2(), Decimal)
-            case opcodes.DIV:
+            case Opcodes.DIV.value:
                 return self.stack.size() > 1 and isinstance(self.stack.peek(), Decimal) and isinstance(self.stack.peek2(), Decimal) 
-            case opcodes.DUP:
+            case Opcodes.DUP.value:
                 # lowest case in a dup is 1 element needed, hence, stack size of 2
                 if self.stack.size() < 2:
                     return False
@@ -159,11 +159,11 @@ class VM:
                     return False
 
                 return self.stack.size()-1 >= int(num)
-            case opcodes.STOP:
+            case Opcodes.STOP.value:
                 return True
-            case opcodes.ROOTHASH:
+            case Opcodes.ROOTHASH.value:
                 return self.stack.size() > 0 and isinstance(self.stack.peek(), str) and self.stack.peek() in EVENTC.values()
-            case opcodes.SHA256:
+            case Opcodes.SHA256.value:
                 # lowest case in a sha512 is 1 element needed, hence, stack size of 2
                 if self.stack.size() < 2:
                     return False
@@ -173,13 +173,13 @@ class VM:
                     return False
                 
                 return self.stack.size()-1 >= int(num) and int(num) > 0 
-            case opcodes.ISZERO:
+            case Opcodes.ISZERO.value:
                 return self.stack.size() > 0 and isinstance(self.stack.peek(), Decimal) 
-            case opcodes.EQ:
+            case Opcodes.EQ.value:
                 return self.stack.size() > 1 and ((isinstance(self.stack.peek(), str) and isinstance(self.stack.peek2(), str)) or (isinstance(self.stack.peek(), Decimal) and isinstance(self.stack.peek2(), Decimal)))
-            case opcodes.STATE:
+            case Opcodes.STATE.value:
                 return self.stack.size() > 0 and isinstance(self.stack.peek(), str) and self.stack.peek() in EVENTC.values()
-            case opcodes.UPDATECACHE:
+            case Opcodes.UPDATECACHE.value:
                 is_valid = self.stack.size() > 0 and isinstance(self.stack.peek(), str) and (self.stack.peek() in EVENTC.values() or self.stack.peek() == 'world_state')
                 if is_valid:
                     if self.stack.peek() in self.cache_state and self.stack.peek() != 'world_state':
@@ -188,16 +188,16 @@ class VM:
                     elif self.stack.peek() == 'world_state':
                         return True
                 return False
-            case opcodes.NOW:
+            case Opcodes.NOW.value:
                 return True
-            case opcodes.SWAP:
+            case Opcodes.SWAP.value:
                 # can swap a decimal with a string
                 return self.stack.size() > 1
-            case opcodes.CADDR:
+            case Opcodes.CADDR.value:
                 return self.stack.size() > 0 and isinstance(self.stack.peek(), str)
-            case opcodes.DADDR:
+            case Opcodes.DADDR.value:
                 return self.stack.size() > 0 and isinstance(self.stack.peek(), str) and self.stack.peek() in self.cache_accounts
-            case opcodes.CENTRY:
+            case Opcodes.CENTRY.value:
                 first_check = self.stack.size() > 0 and isinstance(self.stack.peek(), str)
                 if not first_check:
                     log.warning(f"stack size is 0: {self.stack.size()} or entry name is not a string")
@@ -439,32 +439,32 @@ class VM:
                         return False
                     case _:
                         return False
-            case opcodes.DENTRY:
+            case Opcodes.DENTRY.value:
                 return self.stack.size() > 1 and isinstance(self.stack.peek(), str) and isinstance(self.stack.peek2(), str) and self.stack.peek2() in EVENTC.values()
-            case opcodes.PREPFINALISE:
+            case Opcodes.PREPFINALISE.value:
                 new_l = [x for x in self.stack.get_stack() if isinstance(x, str)]
                 if len(new_l) == 0:
                     return False
                 
                 res = reduce(lambda a, b: a and b, new_l)
                 return isinstance(res, bool) and res
-            case opcodes.CALCSTATE:
+            case Opcodes.CALCSTATE.value:
                 return self.stack.size() > 0 and isinstance(self.stack.peek(), str) and self.stack.peek() in EVENTC.values()
-            case opcodes.MSTORE:
+            case Opcodes.MSTORE.value:
                 return self.stack.size() > 0 and isinstance(self.stack.peek(), str)
-            case opcodes.MLOAD:
+            case Opcodes.MLOAD.value:
                 return self.stack.size() > 0 and isinstance(self.stack.peek(), str) and self.stack.peek() in self.memory
-            case opcodes.LT:
+            case Opcodes.LT.value:
                return self.stack.size() > 1 and type(self.stack.peek()) == type(self.stack.peek2())
-            case opcodes.GT:
+            case Opcodes.GT.value:
                return self.stack.size() > 1 and type(self.stack.peek()) == type(self.stack.peek2())
-            case opcodes.PANIC:
+            case Opcodes.PANIC.value:
                 return self.stack.size() > 0 and isinstance(self.stack.peek(), Decimal)
-            case opcodes.BALANCE:
+            case Opcodes.BALANCE.value:
                 return self.stack.size() > 0 and isinstance(self.stack.peek(), str)
-            case opcodes.CALCROOTHASH:
+            case Opcodes.CALCROOTHASH.value:
                 return self.stack.size() > 0 and isinstance(self.stack.peek(), str) and self.stack.peek() in EVENTC.values()
-            case opcodes.UPROOTHASH:
+            case Opcodes.UPROOTHASH.value:
                 if self.stack.size() > 0 and isinstance(self.stack.peek(), str):
                     is_valid_hash = re.search("^[a-f0-9]{64}$", self.stack.peek())
 
@@ -473,7 +473,7 @@ class VM:
                         return False
 
                     return self.stack.size() > 1 and isinstance(self.stack.peek2(), str) and (self.stack.peek2() in EVENTC.values() or self.stack.peek2() == 'main')
-            case opcodes.CALCMAINSTATE:
+            case Opcodes.CALCMAINSTATE.value:
                 total_earned_exists = ['total_earned' in v for k in self.cache_state for _k, v in self.cache_state[k].items() if EVENTC[SELL] == k and 'state' == _k]
                 total_spent_exists = ['total_spent' in v for k in self.cache_state for _k, v in self.cache_state[k].items() if EVENTC[BUY] == k and 'state' == _k]
                 total_birds_exists = ['total_birds' in v for k in self.cache_state for _k, v in self.cache_state[k].items() if 'world_state' == k and 'main' == _k]
@@ -524,11 +524,11 @@ class VM:
         while self.pc < len(self.code):
             log.debug(f"Stack dump: {self.stack.get_stack()}")
             val = self.code[self.pc]
-            if not self.is_instr_safe(val, elem=self.code[self.pc+1] if self.pc+1 < len(self.code) and val == opcodes.PUSH else None):
+            if not self.is_instr_safe(val, elem=self.code[self.pc+1] if self.pc+1 < len(self.code) and val == Opcodes.PUSH.value else None):
                 log.error(f"Instruction provided not safe, {val}")
                 return None, None, None
 
-            if val == opcodes.PUSH:
+            if val == Opcodes.PUSH.value:
                 self.stack, self.memory, self.pc, self.cache_state, self.cache_accounts = inst_mapping[str(val)](self.code[self.pc+1], stack=self.stack, memory=self.memory, pc=self.pc, analysed=self.analysed_code)
             else:
                 self.stack, self.memory, self.pc, self.cache_state, self.cache_accounts = inst_mapping[str(val)](stack=self.stack, memory=self.memory, pc=self.pc, analysed=self.analysed_code)

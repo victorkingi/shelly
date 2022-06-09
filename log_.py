@@ -1,6 +1,5 @@
 import logging
 
-
 FMT = "[{levelname:^9}] {asctime} {name}: {message}"
 FORMATS = {
     logging.DEBUG: FMT,

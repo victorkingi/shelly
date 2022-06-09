@@ -9,7 +9,7 @@ import time
 import sys
 import re
 
-from opcodes import *
+from opcodes import Opcodes
 from util import *
 from log_ import log
 from constants import *
@@ -174,6 +174,7 @@ def lt(stack=None, memory=None, pc=None, analysed=None):
     stack.push(Decimal(1) if b < a else Decimal(0))
     
     return stack, memory, pc, cache_state, cache_accounts
+
 
 def gt(stack=None, memory=None, pc=None, analysed=None):
     log.debug(f"{pc}: GT")
@@ -457,6 +458,7 @@ def panic(stack=None, memory=None, pc=None, analysed=None):
 
     return stack, memory, pc, cache_state, cache_accounts
 
+
 def is_zero(stack=None, memory=None, pc=None, analysed=None):
     log.debug(f"{pc}: ISZERO")
     pc += 1
@@ -477,8 +479,6 @@ def eq(stack=None, memory=None, pc=None, analysed=None):
 
     stack.push(Decimal(1) if a == b else Decimal(0))
     return stack, memory, pc, cache_state, cache_accounts
-
-
 
 
 def get_state(stack=None, memory=None, pc=None, analysed=None):
@@ -722,7 +722,7 @@ def timestamp_now(stack=None, memory=None, pc=None, analysed=None):
     log.debug(f"{pc}: NOW")
     pc += 1
 
-    stack.push(Decimal(time.time()))
+    stack.push(Decimal(f'{time.time()}'))
     return stack, memory, pc, cache_state, cache_accounts
 
 
@@ -1793,37 +1793,38 @@ def initialise():
 
 # initialise()
 
+
 inst_mapping = {
-    str(PUSH): push,
-    str(DUP): dup,
-    str(ADD): add,
-    str(MUL): mul,
-    str(SUB): sub,
-    str(DIV): div,
-    str(EQ): eq,
-    str(LT): lt,
-    str(GT): gt,
-    str(PANIC): panic,
-    str(SWAP): swap,
-    str(ISZERO): is_zero,
-    str(STOP): stop,
-    str(BALANCE): balance,
-    str(ROOTHASH): root_hash,
-    str(SHA256): sha256,
-    str(UPDATECACHE): update_cache,
-    str(STATE): get_state,
-    str(PREPFINALISE): prep_finalise_data,
-    str(CENTRY): create_entry,
-    str(CADDR): create_address,
-    str(DADDR): delete_address,
-    str(DENTRY): delete_entry,
-    str(NOW): timestamp_now,
-    str(CALCSTATE): full_calculate_new_state,
-    str(MLOAD): mload,
-    str(MSTORE): mstore,
-    str(CALCROOTHASH): calculate_root_hash,
-    str(UPROOTHASH): update_root_hash,
-    str(CALCMAINSTATE): calculate_main_state
+    str(Opcodes.PUSH.value): push,
+    str(Opcodes.DUP.value): dup,
+    str(Opcodes.ADD.value): add,
+    str(Opcodes.MUL.value): mul,
+    str(Opcodes.SUB.value): sub,
+    str(Opcodes.DIV.value): div,
+    str(Opcodes.EQ.value): eq,
+    str(Opcodes.LT.value): lt,
+    str(Opcodes.GT.value): gt,
+    str(Opcodes.PANIC.value): panic,
+    str(Opcodes.SWAP.value): swap,
+    str(Opcodes.ISZERO.value): is_zero,
+    str(Opcodes.STOP.value): stop,
+    str(Opcodes.BALANCE.value): balance,
+    str(Opcodes.ROOTHASH.value): root_hash,
+    str(Opcodes.SHA256.value): sha256,
+    str(Opcodes.UPDATECACHE.value): update_cache,
+    str(Opcodes.STATE.value): get_state,
+    str(Opcodes.PREPFINALISE.value): prep_finalise_data,
+    str(Opcodes.CENTRY.value): create_entry,
+    str(Opcodes.CADDR.value): create_address,
+    str(Opcodes.DADDR.value): delete_address,
+    str(Opcodes.DENTRY.value): delete_entry,
+    str(Opcodes.NOW.value): timestamp_now,
+    str(Opcodes.CALCSTATE.value): full_calculate_new_state,
+    str(Opcodes.MLOAD.value): mload,
+    str(Opcodes.MSTORE.value): mstore,
+    str(Opcodes.CALCROOTHASH.value): calculate_root_hash,
+    str(Opcodes.UPROOTHASH.value): update_root_hash,
+    str(Opcodes.CALCMAINSTATE.value): calculate_main_state
 }
 
 
@@ -1964,16 +1965,3 @@ JUMPIF
 STOP
 
 '''
-#TODO Have 2 opcodes, JUMPIF(after analysis, each jumpif in the code should have a destination map to it, to signify end of jumped
-# to destination, ENDJUMP opcode called, doesn't read anything from stack but also analysis contains the jumpif location+1, 
-# changes program counter to that)
-# TODO At the end of main function execution, have STOP(reads last value in stack(should contain only one element) if stack is empty)
-# an error occured. After the stop, include all jump destination code in order of when jumpif was called
-
-
-#TODO break this into steps:
-# final_call() pushes 1,
-# pops final call, pushes at end, get_collection_name_and_total_txs_in_it(pushes, coll_name, tx_ids, total_txs),
-# get_tx(pops num of elements, decreases by 1, if 0, push end_inner_loop_signal else pushes back, pushes tx required data & num),
-# hash them, compare, if true, inner_loop check if done jump_to get_collection_name else jump_to next tx
-# followed by jumpif

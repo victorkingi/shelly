@@ -2,7 +2,7 @@
 
 from decimal import *
 
-from opcodes import *
+from opcodes import Opcodes
 from constants import *
 from nodes import NumberNode, UnaryOpNode, BinOpNode
 from error import NoVisitMethodError, RuntimeError
@@ -20,18 +20,18 @@ class Number:
     
     def add(self, b, code):
         if isinstance(b, Number):
-            code.append([ADD])
+            code.append([Opcodes.ADD.value])
             return Number(self.value + b.value), code, None
 
     
     def sub(self, b, code):
         if isinstance(b, Number):
-            code.append([SUB])
+            code.append([Opcodes.SUB.value])
             return Number(self.value - b.value), code, None
     
     def mul(self, b, code):
         if isinstance(b, Number):
-            code.append([MUL])
+            code.append([Opcodes.MUL.value])
             return Number(self.value * b.value), code, None
 
     def div(self, b, code):
@@ -39,7 +39,7 @@ class Number:
             if b.value == 0:
                 return None, None, RuntimeError(b.pos_start, b.pos_end, 'Division by zero')
 
-            code.append([DIV])
+            code.append([Opcodes.DIV.value])
             return Number(self.value / b.value), code, None
     
 
@@ -84,7 +84,7 @@ class Compiler:
     
     def visit_NumberNode(self, node):
         num = Number(node.tok.value).set_pos(node.pos_start, node.pos_end)
-        self.global_code.append([PUSH, num.value])
+        self.global_code.append([Opcodes.PUSH.value, num.value])
         return RTResult().success(num)
 
 
@@ -125,7 +125,7 @@ class Compiler:
         
         if node.op_tok.type == TT_MINUS:
             num, code, error = num.mul(Number(-1), self.global_code)
-            code.insert(-1, [PUSH, Number(-1).value])
+            code.insert(-1, [Opcodes.PUSH.value, Number(-1).value])
         
         if error:
             return res.failure(error)
