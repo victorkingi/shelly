@@ -13,6 +13,7 @@ valid_strings = ['world_state', 'EVENT', 'SHA256', 'PURITY', 'main', '5,6', '', 
 def CustomMutator(data, max_size, seed):
   fdp = atheris.FuzzedDataProvider(data)
   input_list = fdp.ConsumeIntListInRange(200, 0, total_ops+(len(valid_strings)))
+  temp = list(input_list)
   i = 0
   for x in range(len(input_list)):
     if i+1 < len(input_list):
@@ -36,9 +37,12 @@ def CustomMutator(data, max_size, seed):
   vm_ = VM(input_list)
   res, state, acc = vm_.execute()
   if res is not None or (state is not None and acc is not None):
-    input_list = atheris.Mutate(bytes(input_list), len(input_list))
+    input_list = atheris.Mutate(bytes(temp), len(temp))
   else:
-    input_list = [0, 4, 0, 5, 5, 0, 5, 0, 3, 6, 5, 0, 5, 7, 28]
+    input_list = [0, 'sales', 0, 'purchases', 0, 'trades', 0, 'world_state', 0, 'eggs_collected', 18, 18, 18, 18, 18, 0, 'DUKA', 16, 0, 'PURITY', 16, 0, 'DUKA', 0, 16, 0, 'DUKA', 0, 3, 1, 0, 3, 12, 0, 1, 1, 27, 0, 25, 2, 0, 5, 2, 0, 'PURITY', 3, 0, 'SELL', 14, 0, 125, 0, 'BLACK_HOLE', 25, 8, 11, 29, 3, 0, 125, 0, 'SHA256', 26, 0, '', 0, 'PURITY', 0, 'BLACK_HOLE', 0, 5, 1, 3, 0, 6, 12, 0, 'PURITY', 3, 0, 'TRADE', 14, 0, 125, 0, 'BLACK_HOLE', 25, 8, 11, 29, 3, 0, 125, 0, 'SHA256', 26, 0, '', 0, 'DUKA', 0, 'BLACK_HOLE', 0, 5, 1, 3, 0, 6, 12, 0, 'PURITY', 3, 0, 'TRADE', 14, 0, 'sales', 0, 1, 1, 0, 1, 1, 21, 22, 12, 23, 0, 'trades', 0, 1, 1, 0, 1, 1, 21, 22, 12, 23, 24, 12, 0, 'main', 2, 23, 28]
+    for i in range(len(input_list)):
+      if isinstance(input_list[i], str):
+        input_list[i] = valid_strings.index(input_list[i])+total_ops
 
   return bytes(input_list)
 
