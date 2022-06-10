@@ -133,7 +133,7 @@ class VM:
     def check_safety(self):
         return isinstance(self.code, list) and len(self.code) > 0
     
-
+    
     def is_instr_safe(self, instr, elem=None):
         match instr:
             case Opcodes.PUSH.value:
