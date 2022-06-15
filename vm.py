@@ -133,7 +133,26 @@ class VM:
     def check_safety(self):
         return isinstance(self.code, list) and len(self.code) > 0
     
-    
+
+    def analyse(self):
+        jumpif_list = []
+        jumpdest_list = []
+        k = 0
+        for _ in self.code:
+            if k >= len(self.code):
+                break
+            if self.code[k] == Opcodes.JUMPIF.value:
+                jumpif_list.append(k)
+            elif self.code[k] == Opcodes.JUMPDEST.value:
+                jumpdest_list.append(k)
+
+            if self.code[k] == Opcodes.PUSH.value:
+                k += 2
+            else:
+                k += 1
+        self.analysed_code = {str(jumpif_list[i]): jumpdest_list[i] for i in range(len(jumpif_list))}
+
+
     def is_instr_safe(self, instr, elem=None):
         match instr:
             case Opcodes.PUSH.value:
@@ -479,6 +498,10 @@ class VM:
                 total_birds_exists = ['total_birds' in v for k in self.cache_state for _k, v in self.cache_state[k].items() if 'world_state' == k and 'main' == _k]
                 is_len_valid = len(total_earned_exists) == len(total_spent_exists) == len(total_birds_exists) == 1
                 return is_len_valid and total_earned_exists[0] and total_spent_exists[0] and total_birds_exists[0]
+            case Opcodes.JUMPIF.value:
+                return self.stack.size() > 0 and isinstance(self.stack.peek(), Decimal)
+            case Opcodes.JUMPDEST.value:
+                return True
             case _:
                 log.warning("Invalid opcode provided")
                 return False

@@ -5,6 +5,9 @@ import sys
 from decimal import *
 from log_ import fh
 from common_opcodes import *
+from util import map_nested_dicts_modify
+from test_data import create_instr
+import json
 
 
 if __name__ == '__main__':
@@ -30,9 +33,19 @@ if __name__ == '__main__':
                 eggs = [26, '32,21',26, 1,26, 1,26, 1,26, 1,26, 1,26, 1,26, 1, 26, 1, 26, 25, 26, '5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9', 26, 'dfgh', 26, 0, 26, 'EGGS', 14]
                 trade = [26, 45, 26, 654, 26, '',26, '',26, 'hfdg', 26, 'BLACK_HOLE', 26, '5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9', 26, 'dfgh', 26, 0, 26, 'TRADE', 14]
                 ds = [26, 'gfsd', 26, 'dfgs', 26, 1, 26, 253, 26, '5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9',26, 'dfgh',26, 'dfgh',26, 'https://google.com', 26, 'dfgh', 26, 0, 26, 'DS', 14]
-                vm_ = VM(create_sale_instructions())
+                vm_ = VM(create_instr('sales'))
+                vm_.analyse()
                 res, state, acc = vm_.execute()
                 print("vm result:", res)
+                if state is not None and acc is not None:
+                    map_nested_dicts_modify(state, lambda v: float(v) if isinstance(v, Decimal) else v)
+                    map_nested_dicts_modify(acc, lambda v: float(v) if isinstance(v, Decimal) else v)
+                    with open("state.json", "w") as outfile:
+                        json.dump(state, outfile)
+                    with open("accounts.json", "w") as outfile:
+                        json.dump(acc, outfile)
+                    print("execution success")
+
     
     fh.close()
     print("file closed")

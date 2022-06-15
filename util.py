@@ -4,6 +4,7 @@ import hashlib
 from decimal import *
 from log_ import log
 from constants import CREATE, DELETE
+import collections.abc
 
 
 eggs_in_tray = Decimal(30)
@@ -133,7 +134,14 @@ def update_prev_3_states(prev_3, submitted_on, tx_hash):
         prev_3['2']['submitted_on'] = submitted_on
     
     return prev_3
-        
+
+
+def map_nested_dicts_modify(ob, func):
+    for k, v in ob.items():
+        if isinstance(v, collections.abc.Mapping):
+            map_nested_dicts_modify(v, func)
+        else:
+            ob[k] = func(v)
 
 
 def get_collection_hashes(collection_name, cache_state):

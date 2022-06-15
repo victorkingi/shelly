@@ -42,12 +42,15 @@ buyers = set((
     "Lang'at",
     'Wahome',
     'Kamau',
+    'Wakamau',
     'Simiyu',
     'Kinyanjui',
     'Benson',
     'Ben',
+    'Rose',
     'Gitonyi',
-    'Muthomi'
+    'Muthomi',
+    'forgotjeff'
 ))
 b_upper = map(lambda x: x.upper(), buyers)
 VALID_BUYERS = set(b_upper)

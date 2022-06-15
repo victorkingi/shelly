@@ -12,6 +12,8 @@ class Opcodes(AutoName):
     DUP = auto()
     SWAP = auto()
     NOW = auto()
+    JUMPIF = auto()
+    JUMPDEST = auto()
 
     # arithmetic
     ADD = auto()

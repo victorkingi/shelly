@@ -1,4 +1,5 @@
 from opcodes import Opcodes
+from decimal import *
 
 def create_sale_instructions(values={
         'tray_no': 5,
@@ -47,6 +48,11 @@ def create_sale_instructions(values={
         [Opcodes.PUSH.value, 'SELL'],
         [Opcodes.CENTRY.value],
 
+        [Opcodes.PUSH.value, values['section']],
+        [Opcodes.PUSH.value, 'THIKAFARMERS'],
+        [Opcodes.EQ.value],
+        [Opcodes.JUMPIF.value],
+        
         [Opcodes.PUSH.value, values['amount']],
         [Opcodes.PUSH.value, 'BLACK_HOLE'],
         [Opcodes.BALANCE.value],
@@ -69,6 +75,7 @@ def create_sale_instructions(values={
         [Opcodes.NOW.value],
         [Opcodes.PUSH.value, 'TRADE'],
         [Opcodes.CENTRY.value],
+        [Opcodes.JUMPDEST.value],
 
         [Opcodes.PUSH.value, values['amount']],
         [Opcodes.PUSH.value, 'BLACK_HOLE'],
