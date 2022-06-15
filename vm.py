@@ -316,11 +316,11 @@ class VM:
                                     return False
                                 
                                 if values[7] in ["PURITY"]:
-                                    for idx, x in enumerate(self.stack.get_stack()):
-                                        if x == values[5]:
-                                            self.stack.replace(idx, values[7])
-                                            log.warning(f"Item name updated to, {values[7]}")
-                                            break
+                                    is_valid_month = re.search("^([A-Z]{3},)+$", values[5])
+
+                                    if not is_valid_month:
+                                        log.warning(f"Invalid payment months for Purity provided, {values[5]}")
+                                        return False
                                 
                                 return True
                             else:

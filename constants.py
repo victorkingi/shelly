@@ -27,8 +27,8 @@ EGGS = 'EGGS'
 EVENTC = {SELL: 'sales', TRADE: 'trades', BUY: 'purchases', DS: 'dead_sick', EGGS: 'eggs_collected'}
 
 # sections
-VALID_SELL_SECTIONS = set(('CAKES', 'DUKA', 'THIKAFARMERS', 'OTHER'))
-VALID_BUY_SECTIONS = set(('PURITY', 'FEEDS', 'DRUGS', 'OTHER'))
+VALID_SELL_SECTIONS = set(('CAKES', 'DUKA', 'THIKAFARMERS', 'SOTHER'))
+VALID_BUY_SECTIONS = set(('PURITY', 'FEEDS', 'DRUGS', 'POTHER'))
 
 # valid buyers
 buyers = set((
