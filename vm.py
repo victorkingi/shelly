@@ -548,7 +548,7 @@ class VM:
             log.debug(f"Stack dump: {self.stack.get_stack()}")
             val = self.code[self.pc]
             if not self.is_instr_safe(val, elem=self.code[self.pc+1] if self.pc+1 < len(self.code) and val == Opcodes.PUSH.value else None):
-                log.error(f"Instruction provided not safe, {val}")
+                log.error(f"Instruction provided not safe, {val}: {[name for name, member in Opcodes.__members__.items() if member.value == val][0]}")
                 return None, None, None
 
             if val == Opcodes.PUSH.value:

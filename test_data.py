@@ -5,10 +5,12 @@ import json
 from constants import *
 from opcodes import Opcodes
 from common_opcodes import CommonOps
+from util import get_eggs
+from decimal import *
 
-#cred = credentials.Certificate("poultry101-6b1ed-firebase-adminsdk-4h0rk-4b8268dd31.json")
-#firebase_admin.initialize_app(cred)
-#db = firestore.client()
+cred = credentials.Certificate("poultry101-6b1ed-firebase-adminsdk-4h0rk-4b8268dd31.json")
+firebase_admin.initialize_app(cred)
+db = firestore.client()
 
 def write_col_docs(name):
     collection_ref = db.collection(name)
@@ -105,10 +107,42 @@ def write_col_docs(name):
                     return
             all_docs[doc.id] = to_use
 
+    elif name == 'eggs_collected':
+        for doc in docs:
+            print("checking...", doc.id)
+            vals = doc.to_dict()
+
+            to_use = {
+                'a1': int(vals['a1']) if 'a1' in vals else int(vals['A 1']),
+                'a2': int(vals['a2']) if 'a2' in vals else int(vals['A 2']),
+                'b1': int(vals['b1']) if 'b1' in vals else int(vals['B 1']),
+                'b2': int(vals['b2']) if 'b2' in vals else int(vals['B 2']),
+                'c1': int(vals['c1']) if 'c1' in vals else int(vals['C 1']),
+                'c2': int(vals['c2']) if 'c2' in vals else int(vals['C 2']),
+                'broken': int(vals['broken']),
+                'house': int(vals['house']),
+                'trays_collected': vals['trays_store'] if 'trays_store' in vals else '',
+                'by': vals['submittedBy'].upper(),
+                'date': int(vals['date'].timestamp()) if 'date' in vals else int(vals['date_']),
+                'submitted_on': int(vals['submittedOn'].timestamp())
+            }
+
+            if not to_use['trays_collected']:
+                amount = to_use['a1'] + to_use['a2'] + to_use['b1'] + to_use['b2'] + to_use['c1'] + to_use['c2'] + to_use['house']
+                to_use['trays_collected'] = get_eggs(Decimal(amount))[0]
+
+            print(to_use)
+            for k in to_use:
+                if to_use[k] is None:
+                    print(k, "is none")
+                    return
+            all_docs[doc.id] = to_use
+
+
     with open(f"{name}.json", "w") as outfile:
         json.dump(all_docs, outfile)
 
-# write_col_docs('purchases')
+#write_col_docs('eggs_collected')
 
 def flatten(xss):
     return [x for xs in xss for x in xs]
@@ -164,5 +198,7 @@ def create_instr(name):
         #all_instr.append(last_instr)
         all_instr = flatten(all_instr)
         return all_instr
+
+#create_instr('')
 
 #print(create_instr('sales')+create_instr('purchases'))
