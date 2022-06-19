@@ -33,9 +33,9 @@ if __name__ == '__main__':
                 eggs = [26, '32,21',26, 1,26, 1,26, 1,26, 1,26, 1,26, 1,26, 1, 26, 1, 26, 25, 26, '5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9', 26, 'dfgh', 26, 0, 26, 'EGGS', 14]
                 trade = [26, 45, 26, 654, 26, '',26, '',26, 'hfdg', 26, 'BLACK_HOLE', 26, '5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9', 26, 'dfgh', 26, 0, 26, 'TRADE', 14]
                 ds = [26, 'gfsd', 26, 'dfgs', 26, 1, 26, 253, 26, '5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9',26, 'dfgh',26, 'dfgh',26, 'https://google.com', 26, 'dfgh', 26, 0, 26, 'DS', 14]
-                #vm_ = VM(create_instr('sales')+create_instr('purchases')+[0, 'sales', 0, 1, 1, 0, 1, 1, 23, 24, 14, 25, 0, 'trades', 0, 1, 1, 0, 1, 1, 23, 24, 14, 25, 0, 'purchases', 0, 1, 1, 0, 1, 1, 23, 24, 14, 25, 26, 14, 0, 'main', 2, 25, 30])
+                vm_ = VM(create_instr('sales')+create_instr('purchases')+[0, 'sales', 0, 1, 1, 0, 1, 1, 23, 24, 14, 25, 0, 'trades', 0, 1, 1, 0, 1, 1, 23, 24, 14, 25, 0, 'purchases', 0, 1, 1, 0, 1, 1, 23, 24, 14, 25, 26, 14, 0, 'main', 2, 25, 30])
                 #cops = CommonOps()
-                vm_ = VM(create_instr('eggs_collected')[:-1]+[0, 'WEEK', 0, 1647291600, 22, 31])
+                #vm_ = VM(create_instr('eggs_collected')[:-1]+[0, 'MONTH', 0, 1652734800, 22, 31])
                 # 1647291600 1640034000
                 vm_.analyse()
                 res, state, acc = vm_.execute()

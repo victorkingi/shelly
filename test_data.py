@@ -8,9 +8,9 @@ from common_opcodes import CommonOps
 from util import get_eggs
 from decimal import *
 
-#cred = credentials.Certificate("poultry101-6b1ed-firebase-adminsdk-4h0rk-4b8268dd31.json")
-#firebase_admin.initialize_app(cred)
-#db = firestore.client()
+cred = credentials.Certificate("poultry101-6b1ed-firebase-adminsdk-4h0rk-4b8268dd31.json")
+firebase_admin.initialize_app(cred)
+db = firestore.client()
 
 def write_col_docs(name):
     collection_ref = db.collection(name)
@@ -164,19 +164,22 @@ def create_instr(name):
 
             '''
             if not first:
+                
+            
+            
+            '''
+            if not first and name == 'eggs_collected':
+                temp = temp[12:]
+            elif not first:
                 temp = temp[15:]
             elif first and name == 'sales':
                 first = False
             elif name != 'sales':
                 temp = temp[15:]
-            '''
-            if not first and name == 'eggs_collected':
-                temp = temp[12:]
-            else:
-                first = False
             
             if name == 'eggs_collected':
                 last_instr = list(temp[-19:])
+                print(last_instr)
                 temp = temp[:-19]
             else:
                 last_instr = list(temp[-31:])
@@ -208,6 +211,6 @@ def create_instr(name):
         all_instr = flatten(all_instr)
         return all_instr
 
-#create_instr('eggs_collected')
+create_instr('eggs_collected')
 
 #print(create_instr('sales')+create_instr('purchases'))
