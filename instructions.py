@@ -22,6 +22,7 @@ getcontext().traps[FloatOperation] = True
 TWOPLACES = Decimal(10) ** -2 
 
 other = 'other'
+starting_birds_no = Decimal(500)
 
 cred = credentials.Certificate("core101-3afde-firebase-adminsdk-sxm20-194a475b51.json")
 firebase_admin.initialize_app(cred)
@@ -1196,6 +1197,7 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
     next_month = Decimal(0)
 
     cache_state['trades']['state']['balances'] = cache_accounts
+    i = 0
     
     for id in cache_state[collection_name]:
         if id == 'state' or id == 'prev_states':
@@ -1203,22 +1205,10 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
         
         tx = cache_state[collection_name][id]
 
-        if is_first:
-            next_week = tx['date']['unix'] + week_in_seconds
-            next_month = tx['date']['unix'] + month_in_seconds
-            is_first = False
-        
-        temp_date = Decimal(str(tx['date']['unix']))
-        while temp_date > next_week:
-            next_week += week_in_seconds
-        
-        next_week -= week_in_seconds
-        
-        while temp_date > next_month:
-            next_month += month_in_seconds
-        
-        next_month -= month_in_seconds
-
+        if i == 0:
+            next_week = 1618866000
+            next_month = 1620680400
+    
         if collection_name == EVENTC[SELL]:
             # after a sale entry, increase values
             amount = tx['tray_no'] * tx['tray_price']
@@ -1238,11 +1228,16 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
     
                 while str(prev_week) not in cache_state[collection_name]['state']['week_trays_sold_earned']:
                     if prev_week < 0:
-                        prev_week = 0
+                        prev_week = next_week - week_in_seconds
+                        cache_state[collection_name]['state']['week_trays_and_exact'][str(prev_week)] = {}
+                        log.warning(f"No previous week found from {prev_week}")
                         break
                     prev_week -= week_in_seconds
          
                 while str(temp_next_week) not in cache_state[collection_name]['state']['week_trays_sold_earned']:
+                    if temp_next_week < 0:
+                        log.error(f"No next week found from {next_week}")
+                        return None, None, None, None, None
                     temp_next_week -= week_in_seconds
           
                 
@@ -1266,25 +1261,20 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
                 week_dict[f'trays_sold_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] = tx['tray_no']
 
             else:
-                if str(next_week) in cache_state[collection_name]['state']['week_trays_sold_earned']:
-                    week_dict = cache_state[collection_name]['state']['week_trays_sold_earned'][str(next_week)]
-                    week_dict['earned'] += amount
-                    week_dict['trays_sold'] += tx['tray_no']
-
-                    if f'earned_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}' in week_dict: 
-                        week_dict[f'earned_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] += amount
-                        week_dict[f'trays_sold_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] += tx['tray_no']
-                    else:
-                        week_dict[f'earned_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] = amount
-                        week_dict[f'trays_sold_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] = tx['tray_no']
-                else:
+                if i == 0:
                     cache_state[collection_name]['state']['week_trays_sold_earned'][str(next_week)] = {}
-                    week_dict = cache_state[collection_name]['state']['week_trays_sold_earned'][str(next_week)]
-                    week_dict['earned'] = amount
+
+                week_dict = cache_state[collection_name]['state']['week_trays_sold_earned'][str(next_week)]
+                week_dict['earned'] = amount + week_dict['earned'] if 'earned' in week_dict else Decimal(0)
+                week_dict['trays_sold'] = tx['tray_no'] + week_dict['trays_sold'] if 'trays_sold' in week_dict else Decimal(0)
+
+                if f'earned_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}' in week_dict: 
+                    week_dict[f'earned_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] += amount
+                    week_dict[f'trays_sold_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] += tx['tray_no']
+                else:
                     week_dict[f'earned_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] = amount
-                    week_dict['trays_sold'] = tx['tray_no']
                     week_dict[f'trays_sold_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] = tx['tray_no']
-            
+
             # if new month
             if tx['date']['unix'] > next_month:
                 # calculate change given last 2 complete months
@@ -1293,11 +1283,16 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
     
                 while str(prev_month) not in cache_state[collection_name]['state']['month_trays_sold_earned']:
                     if prev_month < 0:
-                        prev_month = 0
+                        prev_month = next_month - month_in_seconds
+                        cache_state[collection_name]['state']['month_trays_and_exact'][str(prev_month)] = {}
+                        log.warning(f"No previous month found from {prev_month}")
                         break
                     prev_month -= month_in_seconds
                 
                 while str(temp_next_month) not in cache_state[collection_name]['state']['month_trays_sold_earned']:
+                    if temp_next_month < 0:
+                        log.error(f"No next month found from {next_month}")
+                        return None, None, None, None, None
                     temp_next_month -= month_in_seconds
                 
 
@@ -1321,23 +1316,15 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
                 month_dict[f'trays_sold_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] = tx['tray_no']
                 
             else:
-                if str(next_month) in cache_state[collection_name]['state']['month_trays_sold_earned']:
-                    month_dict = cache_state[collection_name]['state']['month_trays_sold_earned'][str(next_month)]
-                    month_dict['earned'] += amount
-                    month_dict['trays_sold'] += tx['tray_no']
+                month_dict = cache_state[collection_name]['state']['month_trays_sold_earned'][str(next_month)]
+                month_dict['earned'] = amount + month_dict['earned'] if 'earned' in month_dict else Decimal(0)
+                month_dict['trays_sold'] = tx['tray_no'] + month_dict['trays_sold'] if 'trays_sold' in month_dict else Decimal(0)
 
-                    if f'earned_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}' in month_dict:
-                        month_dict[f'earned_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] += amount
-                        month_dict[f'trays_sold_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] += tx['tray_no']
-                    else:
-                        month_dict[f'earned_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] = amount
-                        month_dict[f'trays_sold_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] = tx['tray_no']
+                if f'earned_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}' in month_dict:
+                    month_dict[f'earned_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] += amount
+                    month_dict[f'trays_sold_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] += tx['tray_no']
                 else:
-                    cache_state[collection_name]['state']['month_trays_sold_earned'][str(next_month)] = {}
-                    month_dict = cache_state[collection_name]['state']['month_trays_sold_earned'][str(next_month)]
-                    month_dict['earned'] = amount
                     month_dict[f'earned_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] = amount
-                    month_dict['trays_sold'] = tx['tray_no']
                     month_dict[f'trays_sold_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] = tx['tray_no']
 
         elif collection_name == EVENTC[BUY]:
@@ -1359,11 +1346,16 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
                 
                 while str(prev_week) not in cache_state[collection_name]['state']['week_items_bought_spent']:
                     if prev_week < 0:
-                        prev_week = 0
+                        prev_week = next_week - week_in_seconds
+                        cache_state[collection_name]['state']['week_trays_and_exact'][str(prev_week)] = {}
+                        log.warning(f"No previous week found from {prev_week}")
                         break
                     prev_week -= week_in_seconds
                 
                 while str(temp_next_week) not in cache_state[collection_name]['state']['week_items_bought_spent']:
+                    if temp_next_week < 0:
+                        log.error(f"No next week found from {next_week}")
+                        return None, None, None, None, None
                     temp_next_week -= week_in_seconds
                 
 
@@ -1387,23 +1379,18 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
                 week_dict[f'items_bought_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] = tx['item_no']
 
             else:
-                if str(next_week) in cache_state[collection_name]['state']['week_items_bought_spent']:
-                    week_dict = cache_state[collection_name]['state']['week_items_bought_spent'][str(next_week)]
-                    week_dict['spent'] += amount       
-                    week_dict['items_bought'] += tx['item_no']
-
-                    if f'spent_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}' in week_dict:
-                        week_dict[f'spent_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] += amount
-                        week_dict[f'items_bought_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] += tx['item_no']
-                    else:
-                        week_dict[f'spent_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] = amount
-                        week_dict[f'items_bought_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] = tx['item_no']
-                else:
+                if i == 0:
                     cache_state[collection_name]['state']['week_items_bought_spent'][str(next_week)] = {}
-                    week_dict = cache_state[collection_name]['state']['week_items_bought_spent'][str(next_week)]
-                    week_dict['spent'] = amount
+
+                week_dict = cache_state[collection_name]['state']['week_items_bought_spent'][str(next_week)]
+                week_dict['spent'] = amount + week_dict['spent'] if 'spent' in week_dict else Decimal(0)
+                week_dict['items_bought'] = tx['item_no'] + week_dict['items_bought'] if 'items_bought' in week_dict else Decimal(0)
+
+                if f'spent_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}' in week_dict:
+                    week_dict[f'spent_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] += amount
+                    week_dict[f'items_bought_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] += tx['item_no']
+                else:
                     week_dict[f'spent_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] = amount
-                    week_dict['items_bought'] = tx['item_no']
                     week_dict[f'items_bought_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] = tx['item_no']
             
             # if new month
@@ -1414,11 +1401,16 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
                 
                 while str(prev_month) not in cache_state[collection_name]['state']['month_items_bought_spent']:
                     if prev_month < 0:
-                        prev_month = 0
+                        prev_month = next_month - month_in_seconds
+                        cache_state[collection_name]['state']['month_trays_and_exact'][str(prev_month)] = {}
+                        log.warning(f"No previous month found from {prev_month}")
                         break
                     prev_month -= month_in_seconds
                 
                 while str(temp_next_month) not in cache_state[collection_name]['state']['month_items_bought_spent']:
+                    if temp_next_month < 0:
+                        log.error(f"No next month found from {next_month}")
+                        return None, None, None, None, None
                     temp_next_month -= month_in_seconds
                 
 
@@ -1442,23 +1434,18 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
                 month_dict[f'items_bought_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] = tx['item_no']
                 
             else:
-                if str(next_month) in cache_state[collection_name]['state']['month_items_bought_spent']:
-                    month_dict = cache_state[collection_name]['state']['month_items_bought_spent'][str(next_month)]
-                    month_dict['spent'] += amount
-                    month_dict['items_bought'] += tx['item_no']
-
-                    if f'spent_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}' in month_dict:
-                        month_dict[f'spent_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] += amount
-                        month_dict[f'items_bought_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] += tx['item_no']
-                    else:
-                        month_dict[f'spent_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] = amount
-                        month_dict[f'items_bought_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] = tx['item_no']
-                else:
+                if i == 0:
                     cache_state[collection_name]['state']['month_items_bought_spent'][str(next_month)] = {}
-                    month_dict = cache_state[collection_name]['state']['month_items_bought_spent'][str(next_month)]
-                    month_dict['spent'] = amount
+
+                month_dict = cache_state[collection_name]['state']['month_items_bought_spent'][str(next_month)]
+                month_dict['spent'] = amount + month_dict['spent'] if 'spent' in month_dict else Decimal(0)
+                month_dict['items_bought'] = tx['item_no'] + month_dict['items_bought'] if 'items_bought' in month_dict else Decimal(0)
+
+                if f'spent_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}' in month_dict:
+                    month_dict[f'spent_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] += amount
+                    month_dict[f'items_bought_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] += tx['item_no']
+                else:
                     month_dict[f'spent_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] = amount
-                    month_dict['items_bought'] = tx['item_no']
                     month_dict[f'items_bought_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] = tx['item_no']
 
         elif collection_name == EVENTC[TRADE]:
@@ -1492,9 +1479,18 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
                 # calculate change given last 2 complete weeks
                 prev_week = next_week - week_in_seconds
                 temp_next_week = next_week
+
                 while str(prev_week) not in cache_state[collection_name]['state']['week_trays_and_exact']:
+                    if prev_week < 0:
+                        prev_week = next_week - week_in_seconds
+                        cache_state[collection_name]['state']['week_trays_and_exact'][str(prev_week)] = {}
+                        log.warning(f"No previous week found from {prev_week}")
+                        break
                     prev_week -= week_in_seconds
                 while str(temp_next_week) not in cache_state[collection_name]['state']['week_trays_and_exact']:
+                    if temp_next_week < 0:
+                        log.error(f"No next week found from {next_week}")
+                        return None, None, None, None, None
                     temp_next_week -= week_in_seconds
 
                 prev_week_dict = state['week_trays_and_exact'][str(prev_week)]
@@ -1516,23 +1512,16 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
                 state['week_trays_and_exact'][str(next_week)] = week_dict
 
             else:
-                if str(next_week) in state['week_trays_and_exact']:
-                    week_dict = state['week_trays_and_exact'][str(next_week)]
-                    week_dict['trays_collected'] = increment_eggs(tx['trays_collected'], week_dict['trays_collected'])[0]
-                    week_dict['exact'] = increment_eggs(amount, week_dict['exact'])[0]
-                    state['week_trays_and_exact'][str(next_week)] = week_dict
-
-                    if week_dict['trays_collected'] is None or week_dict['exact'] is None:
-                        return None, None, None, None, None
-                else:
+                if i == 0:
                     state['week_trays_and_exact'][str(next_week)] = {}
-                    week_dict = state['week_trays_and_exact'][str(next_week)]
-                    week_dict['trays_collected'] = increment_eggs(tx['trays_collected'], (week_dict['trays_collected'] if 'trays_collected' in week_dict else Decimal(0)))[0]
-                    week_dict['exact'] = increment_eggs(amount, (week_dict['exact'] if 'exact' in week_dict else Decimal(0)))[0]
-                    state['week_trays_and_exact'][str(next_week)] = week_dict
 
-                    if week_dict['trays_collected'] is None or week_dict['exact'] is None:
-                        return None, None, None, None, None
+                week_dict = state['week_trays_and_exact'][str(next_week)]
+                week_dict['trays_collected'] = increment_eggs(tx['trays_collected'], week_dict['trays_collected'] if 'trays_collected' in week_dict else Decimal(0))[0]
+                week_dict['exact'] = increment_eggs(amount, week_dict['exact'] if 'exact' in week_dict else Decimal(0))[0]
+                state['week_trays_and_exact'][str(next_week)] = week_dict
+
+                if week_dict['trays_collected'] is None or week_dict['exact'] is None:
+                    return None, None, None, None, None
             
             # if new month
             if tx['date']['unix'] > next_month:
@@ -1540,8 +1529,16 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
                 prev_month = next_month - month_in_seconds
                 temp_next_month = next_month
                 while str(prev_month) not in cache_state[collection_name]['state']['month_trays_and_exact']:
+                    if prev_month < 0:
+                        prev_month = next_month - month_in_seconds
+                        cache_state[collection_name]['state']['month_trays_and_exact'][str(prev_month)] = {}
+                        log.warning(f"No previous month found from {prev_month}")
+                        break
                     prev_month -= month_in_seconds
                 while str(temp_next_month) not in cache_state[collection_name]['state']['month_trays_and_exact']:
+                    if temp_next_month < 0:
+                        log.error(f"No next month found from {next_month}")
+                        return None, None, None, None, None
                     temp_next_month -= month_in_seconds
 
                 prev_month_dict = state['month_trays_and_exact'][str(prev_month)]
@@ -1563,30 +1560,25 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
                 state['month_trays_and_exact'][str(next_month)] = month_dict
 
             else:
-                if str(next_month) in state['month_trays_and_exact']:
-                    month_dict = state['month_trays_and_exact'][str(next_month)]
-                    month_dict['trays_collected'] = increment_eggs(tx['trays_collected'], (month_dict['trays_collected'] if 'trays_collected' in month_dict else Decimal(0)))[0]
-                    month_dict['exact'] = increment_eggs(amount, (month_dict['exact'] if 'exact' in month_dict else Decimal(0)))[0]
-                    state['month_trays_and_exact'][str(next_month)] = month_dict
-                    
-                    if month_dict['trays_collected'] is None or month_dict['exact'] is None:
-                        return None, None, None, None, None
-                else:
+                if i == 0:
                     state['month_trays_and_exact'][str(next_month)] = {}
-                    month_dict = state['month_trays_and_exact'][str(next_month)]
-                    month_dict['trays_collected'] = increment_eggs(tx['trays_collected'], (month_dict['trays_collected'] if 'trays_collected' in month_dict else Decimal(0)))[0]
-                    month_dict['exact'] = increment_eggs(amount, (month_dict['exact'] if 'exact' in month_dict else Decimal(0)))[0]
-                    state['month_trays_and_exact'][str(next_month)] = month_dict
-                    
-                    if month_dict['trays_collected'] is None or month_dict['exact'] is None:
-                        return None, None, None, None, None
+
+                month_dict = state['month_trays_and_exact'][str(next_month)]
+                month_dict['trays_collected'] = increment_eggs(tx['trays_collected'], (month_dict['trays_collected'] if 'trays_collected' in month_dict else Decimal(0)))[0]
+                month_dict['exact'] = increment_eggs(amount, (month_dict['exact'] if 'exact' in month_dict else Decimal(0)))[0]
+                state['month_trays_and_exact'][str(next_month)] = month_dict
+                
+                if month_dict['trays_collected'] is None or month_dict['exact'] is None:
+                    return None, None, None, None, None
 
             cache_state[collection_name]['state'] = state
 
         elif collection_name == EVENTC[DS]:
             if tx['section'] == 'DEAD':
                 state['total_dead'] += 1
-    
+
+        i += 1
+
     return stack, memory, pc, cache_state, cache_accounts
 
 
@@ -1713,22 +1705,31 @@ def calculate_main_state(stack=None, memory=None, pc=None, analysed=None):
 
     if current_week:
         current_week = Decimal(max(current_week))
-        temp = str(current_week)
-        current_week -= week_in_seconds
+        current_week -= week_in_seconds # we go back one week as we assume the current week can receive new data anytime, hence not complete
+        temp = current_week
+
+        while str(current_week) not in cache_state['eggs_collected']['state']['week_trays_and_exact']:
+            if current_week < 0:
+                log.error(f"No last week laying data found from {temp}")
+                return None, None, None, None, None
+            current_week -= week_in_seconds
+
         current_week = str(current_week)
-        if current_week not in cache_state['eggs_collected']['state']['week_trays_and_exact']:
-            current_week = temp
     else:
         log.error("Current week does not exist in eggs_collected")
         return None, None, None, None, None
     
     if current_month:
         current_month = Decimal(max(current_month))
-        temp = str(current_month)
-        current_month -= month_in_seconds
+        current_month -= month_in_seconds # we go back one month as we assume the current month can receive new data anytime, hence not complete
+        temp = current_month
+        while str(current_month) not in cache_state['eggs_collected']['state']['month_trays_and_exact']:
+            if current_month < 0:
+                log.error(f"No last month laying data found from {temp}")
+                return None, None, None, None, None
+            current_month -= month_in_seconds
+
         current_month = str(current_month)
-        if current_month not in cache_state['eggs_collected']['state']['month_trays_and_exact']:
-            current_month = temp
     else:
         log.error("Current month does not exist in eggs_collected")
         return None, None, None, None, None
@@ -1738,9 +1739,23 @@ def calculate_main_state(stack=None, memory=None, pc=None, analysed=None):
     amount_eggs_month = cache_state['eggs_collected']['state']['month_trays_and_exact'][current_month]['trays_collected']
     amount_eggs_month = get_eggs(amount_eggs_month)[1]
 
-  
-    cache_state['world_state']['main']['week_laying_percent'][current_week] = amount_eggs_week / Decimal(total_birds)
-    cache_state['world_state']['main']['month_laying_percent'][current_month] = amount_eggs_month / Decimal(total_birds)
+    week_laying_percent = (amount_eggs_week / Decimal(total_birds)) * Decimal(100)
+    month_laying_percent = (amount_eggs_month / Decimal(total_birds)) * Decimal(100)
+    try:
+        week_laying_percent = week_laying_percent.quantize(TWOPLACES)
+    except InvalidOperation:
+        log.error(f"Invalid Decimal Operation on weekly egg percent, value: {week_laying_percent}")
+        return None, None, None, None, None
+
+    try:
+        month_laying_percent = month_laying_percent.quantize(TWOPLACES)
+    except InvalidOperation:
+        log.error(f"Invalid Decimal Operation on monthly egg percent, value: {month_laying_percent}")
+        return None, None, None, None, None
+    
+    cache_state['world_state']['main']['week_laying_percent'][current_week] = week_laying_percent
+    cache_state['world_state']['main']['month_laying_percent'][current_month] = month_laying_percent
+    
     cache_state['world_state']['main']['total_profit'] = net_profit
     cache_state['world_state']['main']['week_profit'] = week_profit
     cache_state['world_state']['main']['month_profit'] = month_profit
@@ -1760,6 +1775,55 @@ def balance(stack=None, memory=None, pc=None, analysed=None):
     stack.push(Decimal(f'{bal}'))
     return stack, memory, pc, cache_state, cache_accounts
 
+# get all dead txs with time less than or == given push laying percent
+def laying_percent(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: LAYINGPERCENT")
+    pc += 1
+
+    unix_epoch = stack.pop()
+    period = stack.pop()
+
+    dead_docs = cache_state['dead_sick']
+    vals = [ Decimal(value['number']) for key, value in dead_docs.items() if key != 'state' and key != 'prev_states' and Decimal(str(dead_docs[key]['date']['unix'])) <= unix_epoch ]
+    all_dead = reduce(lambda a, b: a + b, vals, 0)
+    rem_birds = starting_birds_no - all_dead
+    total_eggs = Decimal('NaN')
+    percent = Decimal('NaN')
+
+    if period == "WEEK":
+        if str(unix_epoch) not in cache_state['eggs_collected']['state']['week_trays_and_exact']:
+            log.error(f"Given week does not exist in eggs_collected {unix_epoch}")
+            return None, None, None, None, None
+        
+        total_eggs = cache_state['eggs_collected']['state']['week_trays_and_exact'][str(unix_epoch)]['trays_collected']
+        total_eggs = get_eggs(total_eggs)[1]
+        percent = (total_eggs / (Decimal(rem_birds) * Decimal(7))) * Decimal(100)
+
+        try:
+            percent = percent.quantize(TWOPLACES)
+        except InvalidOperation:
+            log.error(f"Invalid Decimal Operation on weekly egg percent, value: {percent}")
+            return None, None, None, None, None
+
+    elif period == "MONTH":
+        if str(unix_epoch) not in cache_state['eggs_collected']['state']['month_trays_and_exact']:
+            log.error(f"Given month does not exist in eggs_collected {unix_epoch}")
+            return None, None, None, None, None
+        
+        total_eggs = cache_state['eggs_collected']['state']['month_trays_and_exact'][str(unix_epoch)]['trays_collected']
+        total_eggs = get_eggs(total_eggs)[1]
+        percent = (total_eggs / (Decimal(rem_birds) * Decimal(28))) * Decimal(100)
+
+        try:
+            percent = percent.quantize(TWOPLACES)
+        except InvalidOperation:
+            log.error(f"Invalid Decimal Operation on monthly egg percent, value: {percent}")
+            return None, None, None, None, None
+  
+    
+    stack.push(percent)
+
+    return stack, memory, pc, cache_state, cache_accounts
 
 # each week and month is represented by a timestamp
 # month is current_timestamp+30days, week is current_timestamp+7days
@@ -1781,10 +1845,10 @@ def initialise():
 
             state['trays_collected_to_timestamp'] = {}
             state['diff_trays_to_exact'] = {} # 0 represents unix 0
-            state['week_trays_and_exact'] = {'1654992000': {'trays_collected': '0,0', 'exact': '0,0'}} # 0 represents timestamp week 0
-            state['month_trays_and_exact'] = {'1656806400': {'trays_collected': '0,0', 'exact': '0,0'}} # 0 represents month 0
-            state['change_week'] = {'1654992000': {'change_trays_collected': 0, 'change_exact': 0 }} # 0 represents (week 0 - week 0), 1 will represent (week 1 - week 0)
-            state['change_month'] = {'1656806400': {'change_trays_collected': 0, 'change_exact': 0 }} # 0 represents (month 0 - month 0), 1 will represent (month 1 - month 0)
+            state['week_trays_and_exact'] = {'1618261200': {'trays_collected': '0,0', 'exact': '0,0'}} # 0 represents timestamp week 0
+            state['month_trays_and_exact'] = {'1618261200': {'trays_collected': '0,0', 'exact': '0,0'}} # 0 represents month 0
+            state['change_week'] = {'1618261200': {'change_trays_collected': 0, 'change_exact': 0 }} # 0 represents (week 0 - week 0), 1 will represent (week 1 - week 0)
+            state['change_month'] = {'1618261200': {'change_trays_collected': 0, 'change_exact': 0 }} # 0 represents (month 0 - month 0), 1 will represent (month 1 - month 0)
 
         elif name == 'sales':
             state['total_sales'] = 0
@@ -1796,7 +1860,7 @@ def initialise():
                 state[f'total_trays_sold_{sec}'] = 0
             # everytime there is a new buyer, we will add a new field total_earned_other_buyer_name
 
-            state['week_trays_sold_earned'] = {'1654992000': {
+            state['week_trays_sold_earned'] = {'1652734800': {
                 'trays_sold': 0,
                 'earned': 0,
                 f'earned_{sections[0]}': 0,
@@ -1809,7 +1873,7 @@ def initialise():
                 f'trays_sold_{sections[3]}': 0, # earned_other_buyer_name added whenever
                 }
             }
-            state['month_trays_sold_earned'] = {'1656806400': {
+            state['month_trays_sold_earned'] = {'1656968400': {
                 'trays_sold': 0,
                 'earned': 0,
                 f'earned_{sections[0]}': 0,
@@ -1822,7 +1886,7 @@ def initialise():
                 f'trays_sold_{sections[3]}': 0, # earned_other_buyer_name added whenever
                 }
             }
-            state['change_week'] = {'1654992000': {
+            state['change_week'] = {'1652734800': {
                 'change_trays_sold': 0,
                 'change_earned': 0,
                 f'change_earned_{sections[0]}': 0,
@@ -1835,7 +1899,7 @@ def initialise():
                 f'change_trays_sold_{sections[3]}': 0, # earned_other_buyer_name added whenever
                 }
             }
-            state['change_month'] = {'1656806400': {
+            state['change_month'] = {'1656968400': {
                 'change_trays_sold': 0,
                 'change_earned': 0,
                 f'change_earned_{sections[0]}': 0,
@@ -1859,7 +1923,7 @@ def initialise():
                 state[f'total_items_bought_{sec}'] = 0
             # everytime there is a new buyer, we will add a new field total_earned_other_buyer_name
 
-            state['week_items_bought_spent'] = {'1654992000': {
+            state['week_items_bought_spent'] = {'1652734800': {
                 'items_bought': 0,
                 'spent': 0,
                 f'spent_{sections[0]}': 0,
@@ -1872,7 +1936,7 @@ def initialise():
                 f'items_bought_{sections[3]}': 0, # earned_other_buyer_name added whenever
                 }
             }
-            state['month_items_bought_spent'] = {'1656806400': {
+            state['month_items_bought_spent'] = {'1656968400': {
                 'items_bought': 0,
                 'spent': 0,
                 f'spent_{sections[0]}': 0,
@@ -1885,7 +1949,7 @@ def initialise():
                 f'items_bought_{sections[3]}': 0, # earned_other_buyer_name added whenever
                 }
             }
-            state['change_week'] = {'1654992000': {
+            state['change_week'] = {'1652734800': {
                 'change_items_bought': 0,
                 'change_spent': 0,
                 f'change_spent_{sections[0]}': 0,
@@ -1898,7 +1962,7 @@ def initialise():
                 f'change_items_bought_{sections[3]}': 0, # earned_other_buyer_name added whenever
                 }
             }
-            state['change_month'] = {'1656806400': {
+            state['change_month'] = {'1656968400': {
                 'change_items_bought': 0,
                 'change_spent': 0,
                 f'change_spent_{sections[0]}': 0,
@@ -1927,8 +1991,8 @@ def initialise():
     
     global_state_ref = db.collection('world_state')
     world_state = {
-        'week_laying_percent': {'1654992000': {}},
-        'month_laying_percent': {'1656806400': {}},
+        'week_laying_percent': {'1618261200': {}},
+        'month_laying_percent': {'1618261200': {}},
         'week_profit': {'0': 0 },
         'month_profit': {'0': 0 },
         'total_profit': 0,
@@ -1965,6 +2029,7 @@ inst_mapping = {
     str(Opcodes.SHA256.value): sha256,
     str(Opcodes.UPDATECACHE.value): update_cache,
     str(Opcodes.STATE.value): get_state,
+    str(Opcodes.LAYINGPERCENT.value): laying_percent,
     str(Opcodes.PREPFINALISE.value): prep_finalise_data,
     str(Opcodes.CENTRY.value): create_entry,
     str(Opcodes.CADDR.value): create_address,

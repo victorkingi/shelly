@@ -4,12 +4,15 @@ from decimal import *
 import re
 import sys
 import os
+import time
 
 from opcodes import Opcodes
 from log_ import log
 from stack import Stack
 from instructions import inst_mapping
 from constants import *
+
+EARLIEST_VALID_YEAR = 1577836800 # unix epoch of earliest reasonable data date which is 1st january midnight 2020
 
 
 class VM:
@@ -232,13 +235,13 @@ class VM:
                             values.pop(0) # we don't need entry_name
 
                             bool_list = []
-                            bool_list.append(isinstance(values[0], Decimal) and values[0] >= 0)
+                            bool_list.append(isinstance(values[0], Decimal) and values[0] >= EARLIEST_VALID_YEAR and values[0] <= Decimal(f'{time.time()}'))
                             bool_list.append(isinstance(values[1], str))
                             bool_list.append(isinstance(values[2], str))
                             bool_list.append(isinstance(values[3], Decimal) and values[3] > 0)
                             bool_list.append(isinstance(values[4], Decimal) and values[4] > 0)
                             bool_list.append(isinstance(values[5], str))
-                            bool_list.append(isinstance(values[6], Decimal) and values[6] >= 0)
+                            bool_list.append(isinstance(values[6], Decimal) and values[6] >= EARLIEST_VALID_YEAR and values[6] <= Decimal(f'{time.time()}'))
                             bool_list.append(isinstance(values[7], str))
                             
                             log.debug(f"bool type list: {bool_list}")
@@ -285,13 +288,13 @@ class VM:
                             values.pop(0) # we don't need entry_name
 
                             bool_list = []
-                            bool_list.append(isinstance(values[0], Decimal)  and values[0] >= 0)
+                            bool_list.append(isinstance(values[0], Decimal)  and values[0] >= EARLIEST_VALID_YEAR and values[0] <= Decimal(f'{time.time()}'))
                             bool_list.append(isinstance(values[1], str))
                             bool_list.append(isinstance(values[2], str))
                             bool_list.append(isinstance(values[3], Decimal)  and values[3] > 0)
                             bool_list.append(isinstance(values[4], Decimal)  and values[4] > 0)
                             bool_list.append(isinstance(values[5], str))
-                            bool_list.append(isinstance(values[6], Decimal)  and values[6] >= 0)
+                            bool_list.append(isinstance(values[6], Decimal)  and values[6] >= EARLIEST_VALID_YEAR and values[6] <= Decimal(f'{time.time()}'))
                             bool_list.append(isinstance(values[7], str))
                             
                             log.debug(f"bool type list: {bool_list}")
@@ -337,14 +340,14 @@ class VM:
                             values.pop(0) # we don't need entry_name
                             
                             bool_list = []
-                            bool_list.append(isinstance(values[0], Decimal)  and values[0] >= 0)
+                            bool_list.append(isinstance(values[0], Decimal)  and values[0] >= EARLIEST_VALID_YEAR and values[0] <= Decimal(f'{time.time()}'))
                             bool_list.append(isinstance(values[1], str))
                             bool_list.append(isinstance(values[2], str))
                             bool_list.append(isinstance(values[3], str))
                             bool_list.append(isinstance(values[4], str))
                             bool_list.append(isinstance(values[5], str))
                             bool_list.append(isinstance(values[6], Decimal)  and values[6] > 0)
-                            bool_list.append(isinstance(values[7], Decimal)  and values[7] >= 0)
+                            bool_list.append(isinstance(values[7], Decimal)  and values[7] >= EARLIEST_VALID_YEAR and values[7] <= Decimal(f'{time.time()}'))
                             bool_list.append(isinstance(values[8], str))
                             bool_list.append(isinstance(values[9], str))
                             
@@ -383,7 +386,7 @@ class VM:
                             values.pop(0) # we don't need entry_name
 
                             bool_list = []
-                            bool_list.append(isinstance(values[0], Decimal)  and values[0] >= 0)
+                            bool_list.append(isinstance(values[0], Decimal)  and values[0] >= EARLIEST_VALID_YEAR and values[0] <= Decimal(f'{time.time()}'))
                             bool_list.append(isinstance(values[1], str))
                             bool_list.append(isinstance(values[2], str))
                             bool_list.append(isinstance(values[3], Decimal)  and values[3] > 0 and values[3] <= 75)
@@ -392,9 +395,9 @@ class VM:
                             bool_list.append(isinstance(values[6], Decimal)  and values[6] > 0 and values[6] <= 75)
                             bool_list.append(isinstance(values[7], Decimal)  and values[7] > 0 and values[7] <= 75)
                             bool_list.append(isinstance(values[8], Decimal)  and values[8] > 0 and values[8] <= 75)
-                            bool_list.append(isinstance(values[9], Decimal)  and values[9] > 0)
-                            bool_list.append(isinstance(values[10], Decimal)  and values[10] > 0)
-                            bool_list.append(isinstance(values[11], Decimal)  and values[11] >= 0)
+                            bool_list.append(isinstance(values[9], Decimal)  and values[9] >= 0)
+                            bool_list.append(isinstance(values[10], Decimal)  and values[10] >= 0)
+                            bool_list.append(isinstance(values[11], Decimal)  and values[11] >= EARLIEST_VALID_YEAR and values[11] <= Decimal(f'{time.time()}'))
                             bool_list.append(isinstance(values[12], str) and not not re.search("^[\d]+,([0-9]|1[0-9]|2[0-9])$", values[12]))
                             
                             log.debug(f"bool type list: {bool_list}")
@@ -424,7 +427,7 @@ class VM:
                             values.pop(0) # we don't need entry_name
 
                             bool_list = []
-                            bool_list.append(isinstance(values[0], Decimal)  and values[0] >= 0)
+                            bool_list.append(isinstance(values[0], Decimal)  and values[0] >= EARLIEST_VALID_YEAR and values[0] <= Decimal(f'{time.time()}'))
                             bool_list.append(isinstance(values[1], str))
                             bool_list.append(isinstance(values[2], str))
                             bool_list.append(isinstance(values[3], str) and not not self.cache_accounts.get(values[3], 0)) # from
@@ -432,7 +435,7 @@ class VM:
                             bool_list.append(isinstance(values[5], str))
                             bool_list.append(isinstance(values[6], str))
                             bool_list.append(isinstance(values[7], Decimal)  and values[7] > 0)
-                            bool_list.append(isinstance(values[8], Decimal)  and values[8] >= 0)
+                            bool_list.append(isinstance(values[8], Decimal)  and values[8] >= EARLIEST_VALID_YEAR and values[8] <= Decimal(f'{time.time()}'))
 
                             if isinstance(values[5], str) and isinstance(values[6], str) and values[5] and values[6]:
                                 log.warning(f"sale hash and purchase hash not empty, contains, purchase hash: {values[5]}, sale hash: {values[6]}")
@@ -502,6 +505,13 @@ class VM:
                 return self.stack.size() > 0 and isinstance(self.stack.peek(), Decimal)
             case Opcodes.JUMPDEST.value:
                 return True
+            case Opcodes.LAYINGPERCENT.value:
+                if self.stack.size() > 1:
+                    if isinstance(self.stack.peek2(), str):
+                        if self.stack.peek2() in ["WEEK", "MONTH"] and isinstance(self.stack.peek(), Decimal) and 'week_trays_and_exact' in self.cache_state['eggs_collected']['state'] and 'month_trays_and_exact' in self.cache_state['eggs_collected']['state']:
+                            return True
+
+                return False
             case _:
                 log.warning("Invalid opcode provided")
                 return False

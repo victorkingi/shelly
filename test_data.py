@@ -8,9 +8,9 @@ from common_opcodes import CommonOps
 from util import get_eggs
 from decimal import *
 
-cred = credentials.Certificate("poultry101-6b1ed-firebase-adminsdk-4h0rk-4b8268dd31.json")
-firebase_admin.initialize_app(cred)
-db = firestore.client()
+#cred = credentials.Certificate("poultry101-6b1ed-firebase-adminsdk-4h0rk-4b8268dd31.json")
+#firebase_admin.initialize_app(cred)
+#db = firestore.client()
 
 def write_col_docs(name):
     collection_ref = db.collection(name)
@@ -123,7 +123,7 @@ def write_col_docs(name):
                 'house': int(vals['house']),
                 'trays_collected': vals['trays_store'] if 'trays_store' in vals else '',
                 'by': vals['submittedBy'].upper(),
-                'date': int(vals['date'].timestamp()) if 'date' in vals else int(vals['date_']),
+                'date': int(vals['date'].timestamp()) if 'date' in vals else int(vals['date_'] / 1000),
                 'submitted_on': int(vals['submittedOn'].timestamp())
             }
 
@@ -162,16 +162,25 @@ def create_instr(name):
             temp = method(values=v)
             i += 1
 
+            '''
             if not first:
                 temp = temp[15:]
             elif first and name == 'sales':
                 first = False
             elif name != 'sales':
                 temp = temp[15:]
+            '''
+            if not first and name == 'eggs_collected':
+                temp = temp[12:]
+            else:
+                first = False
             
-            
-            last_instr = list(temp[-31:])
-            temp = temp[:-31]
+            if name == 'eggs_collected':
+                last_instr = list(temp[-19:])
+                temp = temp[:-19]
+            else:
+                last_instr = list(temp[-31:])
+                temp = temp[:-31]
                 
             all_instr.append(temp)
             jumpif = 0
@@ -195,10 +204,10 @@ def create_instr(name):
 
         print("total entries", i)
         #print("last", last_instr)
-        #all_instr.append(last_instr)
+        all_instr.append(last_instr)
         all_instr = flatten(all_instr)
         return all_instr
 
-#create_instr('')
+#create_instr('eggs_collected')
 
 #print(create_instr('sales')+create_instr('purchases'))

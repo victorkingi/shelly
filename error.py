@@ -42,3 +42,4 @@ class RuntimeError(Error):
 class NoVisitMethodError(Error):
     def __init__(self, node):
         super().__init__(f'No visit_{type(node).__name__} method defined')
+

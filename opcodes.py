@@ -38,6 +38,7 @@ class Opcodes(AutoName):
     DADDR = auto()
     UPDATECACHE = auto()
     STATE = auto()
+    LAYINGPERCENT = auto()
     PREPFINALISE = auto()
     CALCSTATE = auto()
     CALCROOTHASH = auto()
@@ -52,3 +53,5 @@ class Opcodes(AutoName):
     # terminate
     STOP = auto()
     PANIC = auto()
+
+#print(Opcodes.STOP.value)

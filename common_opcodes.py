@@ -235,7 +235,7 @@ class CommonOps:
         return flattened_code
 
 
-    def create_egg_instructions(self, values={
+    def create_eggs_collected_instructions(self, values={
             'a1': 5,
             'a2': 5,
             'b1': 5,
