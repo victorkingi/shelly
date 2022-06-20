@@ -54,4 +54,4 @@ class Opcodes(AutoName):
     STOP = auto()
     PANIC = auto()
 
-#print(Opcodes.STOP.value)
+#print(Opcodes.UPROOTHASH.value)

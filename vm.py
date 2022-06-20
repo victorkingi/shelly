@@ -20,7 +20,7 @@ class VM:
         self.code = code_
         self.log_file = 'vm.log'
         self.stack = Stack()
-        self.memory = {}
+        self.memory = { 'TOTALCREATES': 0, 'TOTALDELETES': 0, 'TOTALREPLACE': 0, 'REPLACED': {}, 'ADDED': {}, 'DELETES': {}}
         self.pc = 0             # program counter
         self.cache_state = {
             'world_state': {
@@ -462,7 +462,7 @@ class VM:
                     case _:
                         return False
             case Opcodes.DENTRY.value:
-                return self.stack.size() > 1 and isinstance(self.stack.peek(), str) and isinstance(self.stack.peek2(), str) and self.stack.peek2() in EVENTC.values()
+                return self.stack.size() > 1 and isinstance(self.stack.peek(), str) and isinstance(self.stack.peek2(), str) and self.stack.peek() in self.cache_state[self.stack.peek2()] if self.stack.peek2() in EVENTC.values() else False
             case Opcodes.PREPFINALISE.value:
                 new_l = [x for x in self.stack.get_stack() if isinstance(x, str)]
                 if len(new_l) == 0:
@@ -513,7 +513,7 @@ class VM:
 
                 return False
             case _:
-                log.warning("Invalid opcode provided")
+                log.warning(f"Invalid opcode provided, {instr}")
                 return False
 
     # silently clears log
@@ -558,7 +558,8 @@ class VM:
             log.debug(f"Stack dump: {self.stack.get_stack()}")
             val = self.code[self.pc]
             if not self.is_instr_safe(val, elem=self.code[self.pc+1] if self.pc+1 < len(self.code) and val == Opcodes.PUSH.value else None):
-                log.error(f"Instruction provided not safe, {val}: {[name for name, member in Opcodes.__members__.items() if member.value == val][0]}")
+                res = [name for name, member in Opcodes.__members__.items() if member.value == val]
+                log.error(f"Instruction provided not safe, {val}: {res[0] if len(res) > 0 else res}")
                 return None, None, None
 
             if val == Opcodes.PUSH.value:
@@ -578,7 +579,14 @@ class VM:
                     log.info(f"execution success, result: {self.stack.peek()}")
                     return self.stack.pop(), None, None
 
-                log.info(f"execution success, cache_state: {self.cache_state}, accounts: {self.cache_accounts}")
+                log.info(f"execution success, replaced {self.memory['TOTALREPLACE']}, created {self.memory['TOTALCREATES']}, deleted {self.memory['TOTALDELETES']} entries")
+                for c in self.memory['ADDED']:
+                    log.info(f"collection: {c} added {self.memory['ADDED'][c]} entries")
+
+                for c in self.memory['REPLACED']:
+                    log.info(f"collection: {c} entries replaced {self.memory['REPLACED'][c]['num']}")
+                    log.info(f"hashes of replaced entries: {[x[:5] for x in self.memory['REPLACED'][c]['hashes']]}")
+                
                 return None, self.cache_state, self.cache_accounts
             
             if self.stack is None and self.pc is None and self.cache_state is None and self.cache_accounts is None:

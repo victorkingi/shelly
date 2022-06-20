@@ -259,6 +259,7 @@ class CommonOps:
             [Opcodes.UPDATECACHE.value],
             [Opcodes.UPDATECACHE.value],
             [Opcodes.UPDATECACHE.value],
+            
             [Opcodes.PUSH.value, values['trays_collected']],
             [Opcodes.PUSH.value, values['date']],
             [Opcodes.PUSH.value, values['house']],
