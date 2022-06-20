@@ -1735,9 +1735,16 @@ def calculate_main_state(stack=None, memory=None, pc=None, analysed=None):
     
     if net_profit > 0:
         # TODO add a check for any withdraws that have ever happened, subtract it from this
-        cache_state['world_state']['main']['available_to_withdraw']['JEFF'] = Decimal('0.05') * net_profit 
-        cache_state['world_state']['main']['available_to_withdraw']['VICTOR'] = Decimal('0.05') * net_profit 
-        cache_state['world_state']['main']['available_to_withdraw']['BABRA'] = Decimal('0.05') * net_profit 
+        profit_ratio = Decimal('0.15')
+        cache_state['world_state']['main']['available_to_withdraw']['JEFF'] =  profit_ratio * net_profit 
+        cache_state['world_state']['main']['available_to_withdraw']['VICTOR'] =  profit_ratio * net_profit 
+        cache_state['world_state']['main']['available_to_withdraw']['BABRA'] =  profit_ratio * net_profit
+        cache_state['world_state']['main']['available_to_withdraw']['REMAIN'] = net_profit - (profit_ratio * net_profit * Decimal(3))
+    else:
+        cache_state['world_state']['main']['available_to_withdraw']['JEFF'] =  Decimal(0)
+        cache_state['world_state']['main']['available_to_withdraw']['VICTOR'] =  Decimal(0)
+        cache_state['world_state']['main']['available_to_withdraw']['BABRA'] = Decimal(0)
+        cache_state['world_state']['main']['available_to_withdraw']['REMAIN'] = Decimal(0)
 
 
     total_birds = cache_state['world_state']['main']['total_birds']
