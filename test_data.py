@@ -7,10 +7,19 @@ from opcodes import Opcodes
 from common_opcodes import CommonOps
 from util import get_eggs
 from decimal import *
+from datetime import datetime
 
 #cred = credentials.Certificate("poultry101-6b1ed-firebase-adminsdk-4h0rk-4b8268dd31.json")
 #firebase_admin.initialize_app(cred)
 #db = firestore.client()
+
+users = {
+    '04d08c83bedef01c48c80c7d8bc4caceb102f32eec4a423136b16b2c5049951884abedcdfdeaf8f9413a7b61e9c607793eacafa7287200cef45f9a4cb4320dd390': 'BABRA',
+    '045371c35c8460a5ee16746ae46a29ac03a2eef67da5985377f34491edede0b654c508c851aeded107d7de7d560c21ac759dd547a289fd097ecad5f718c2edcfef': 'VICTOR',
+    '043139f6bc7808ece9e00aacd80d5d707406c798a35385105ae72b4404d8281cb2f18423a10e65f8569807ee71d53c8fab08cb5e08fb2813b81cbef6294a7181c6': 'JEFF',
+    '04ec74ad5144caefdba5820504a244b1456fdc3bf1031cbe77fc703f61294b42dcce3abe93ff94789d0b65c9b80d667da0708f99f057624e8a8ca64c8272fe66d7': 'PURITY',
+    '04fe89d8d08732b07a5be4d0da407019e0a372f119c0979b6a0890da41a02c913d2df5c97c60e63b3220e030901a95cc75988cbf39b9b857e718b4684ba6948a58': 'ANNE',
+}
 
 def write_col_docs(name):
     collection_ref = db.collection(name)
@@ -138,11 +147,58 @@ def write_col_docs(name):
                     return
             all_docs[doc.id] = to_use
 
+    elif name == 'blockchain':
+        for doc in docs:
+            print("checking...", doc.id)
+            vals = doc.to_dict()
+            txs = vals['chain'][1]['transactions']
+
+            for tx in txs:
+                if 'toAddress' not in tx or 'fromAddress' not in tx:
+                    continue
+                if tx['toAddress'] not in users or tx['fromAddress'] not in users:
+                    continue
+
+                valid_date = None
+                if isinstance(tx['timestamp'], str):
+                    if not tx['timestamp']:
+                        valid_date = 1655912781
+                    elif tx['timestamp'][-1] == 'Z':
+                        valid_date = datetime.fromisoformat(tx['timestamp'][:-1]).timestamp()
+                    else:
+                        if tx['timestamp'][4].isdigit():
+                            valid_date = datetime.strptime(tx['timestamp'][4:], '%d %b %Y').timestamp()
+                        else:
+                            valid_date = datetime.strptime(tx['timestamp'][4:], '%b %d %Y').timestamp()
+                else:
+                    valid_date = tx['timestamp']['_seconds']
+                
+                if valid_date is None:
+                    print("none date", tx['timestamp'], type(tx['timestamp']))
+                    return
+
+                to_use = {
+                    'to': users[tx['toAddress']],
+                    'from': users[tx['fromAddress']],
+                    'amount': tx['amount'],
+                    'by': users[tx['fromAddress']],
+                    'date': valid_date,
+                    'submitted_on': valid_date
+                }
+
+                print(to_use)
+                for k in to_use:
+                    if to_use[k] is None:
+                        print(k, "is none")
+                        return
+            
+                all_docs[doc.id] = to_use
+            
 
     with open(f"{name}.json", "w") as outfile:
         json.dump(all_docs, outfile)
 
-#write_col_docs('eggs_collected')
+#write_col_docs('blockchain')
 
 def flatten(xss):
     return [x for xs in xss for x in xs]
@@ -204,3 +260,4 @@ def create_instr(name):
 
 #fin = create_instr('sales')+create_instr('purchases')+create_instr('eggs_collected')
 #print(create_instr('eggs_collected'))
+#print(create_instr('trade'))

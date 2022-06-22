@@ -421,9 +421,16 @@ class CommonOps:
             [Opcodes.PUSH.value, values['from']],
             [Opcodes.BALANCE.value],
             [Opcodes.LT.value],
+            [Opcodes.JUMPIF.value],
+            
+            [Opcodes.PUSH.value, values['amount']],
+            [Opcodes.PUSH.value, values['from']],
+            [Opcodes.BALANCE.value],
+            [Opcodes.EQ.value],
             [Opcodes.ISZERO.value],
             [Opcodes.PANIC.value],
-
+        
+            [Opcodes.JUMPDEST.value],
             [Opcodes.PUSH.value, values['to']],
             [Opcodes.CADDR.value],
 

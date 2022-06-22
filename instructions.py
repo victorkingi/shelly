@@ -136,7 +136,7 @@ cache_state = {
         'prev_states': {}
     }
 }
-cache_accounts = {'BLACK_HOLE': Decimal(MAX_EMAX) }
+cache_accounts = {'BLACK_HOLE': Decimal(MAX_EMAX), 'ANNE': Decimal(4000) }
 cache_deleted = {} # no need to keep track of this as entries are only dumped into it
 
 
@@ -155,6 +155,15 @@ def push(elem=None, stack=None, memory=None, pc=None, analysed=None):
     else:
         log.error(f"Attempted to push not a str or a decimal type, {type(elem)}")
         return None, None, None, None, None
+
+# does not return the element poped
+def pop(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: POP")
+    pc += 1
+
+    stack.pop()
+    
+    return stack, memory, pc, cache_state, cache_accounts
 
 
 def add(stack=None, memory=None, pc=None, analysed=None):
@@ -765,7 +774,9 @@ def create_address(stack=None, memory=None, pc=None, analysed=None):
     pc += 1
 
     address_name = stack.pop()
-    cache_accounts[address_name] = Decimal(0)
+    if address_name not in cache_accounts:
+        cache_accounts[address_name] = Decimal(0)
+    
     return stack, memory, pc, cache_state, cache_accounts
 
 
@@ -2066,6 +2077,7 @@ def initialise():
 
 inst_mapping = {
     str(Opcodes.PUSH.value): push,
+    str(Opcodes.POP.value): pop,
     str(Opcodes.DUP.value): dup,
     str(Opcodes.ADD.value): add,
     str(Opcodes.MUL.value): mul,

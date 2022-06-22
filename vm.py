@@ -128,7 +128,7 @@ class VM:
                 'prev_states': {}
             }
         }
-        self.cache_accounts = {'BLACK_HOLE': Decimal(MAX_EMAX) } # main money supplier
+        self.cache_accounts = {'BLACK_HOLE': Decimal(MAX_EMAX), 'ANNE': Decimal(4000) } # main money supplier
         self.analysed_code = {}
         self.is_safe = self.check_safety()
 
@@ -163,6 +163,8 @@ class VM:
                     return False
     
                 return True
+            case Opcodes.POP.value:
+                return True
             case Opcodes.ADD.value:
                 return self.stack.size() > 1 and isinstance(self.stack.peek(), Decimal) and isinstance(self.stack.peek2(), Decimal)
             case Opcodes.SUB.value:
@@ -186,15 +188,14 @@ class VM:
             case Opcodes.ROOTHASH.value:
                 return self.stack.size() > 0 and isinstance(self.stack.peek(), str) and self.stack.peek() in EVENTC.values()
             case Opcodes.SHA256.value:
-                # lowest case in a sha512 is 1 element needed, hence, stack size of 2
-                if self.stack.size() < 2:
-                    return False
+                if self.stack.size() > 0:
+                    num = self.stack.peek()
+                    if not isinstance(num, Decimal):
+                        return False
+                    
+                    return self.stack.size()-1 >= int(num) and int(num) >= 0
                 
-                num = self.stack.peek()
-                if not isinstance(num, Decimal):
-                    return False
-                
-                return self.stack.size()-1 >= int(num) and int(num) > 0 
+                return False
             case Opcodes.ISZERO.value:
                 return self.stack.size() > 0 and isinstance(self.stack.peek(), Decimal) 
             case Opcodes.EQ.value:
@@ -548,6 +549,7 @@ class VM:
                
 
     def execute(self):
+        log.info(f"Code size: {len(self.code)}")
         log.info(f"Code input: {self.code}")
 
         if not self.is_safe:
