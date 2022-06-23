@@ -820,7 +820,7 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
     week_in_seconds = 7 * 24 * 60 * 60
     week_in_seconds = Decimal(week_in_seconds)
     month_in_seconds = 28 * 24 * 60 * 60
-    month_in_seconds = Decimal(month_in_seconds) 
+    month_in_seconds = Decimal(month_in_seconds)
 
     log.debug(f"cache after prev_state update but before sort: {cache_state[collection_name]}")
     sorted_tuples = sorted(cache_state[collection_name].items(), key=lambda item: item[1]['date']['unix'] if 'date' in item[1] and 'unix' in item[1]['date'] else Decimal(0))
@@ -1724,7 +1724,7 @@ def initialise():
     global_state_ref.document('main').set(world_state)
     collection_ref.document('prev_states').set({'0': state })
 
-# initialise()
+#initialise()
 
 
 inst_mapping = {
