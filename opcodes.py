@@ -58,4 +58,4 @@ class Opcodes(AutoName):
     DECRBAL = auto()
     INCRBAL = auto()
 
-#print(Opcodes.UPROOTHASH.value)
+#print(Opcodes.PUSH.value)

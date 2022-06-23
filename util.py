@@ -115,25 +115,6 @@ def increment_eggs(val1, val2):
     
     log.error(f"Failed to increment eggs, got unknown types, {type(val1)}, {type(val2)}")
     return None, None
-    
-
-def update_prev_3_states(prev_3, submitted_on, tx_hash):
-    if not prev_3['0']['op']:
-        prev_3['0']['op'] = DELETE
-        prev_3['0']['tx_hash'] = tx_hash
-        prev_3['0']['submitted_on'] = submitted_on
-
-    elif not prev_3['1']['op']:
-        prev_3['1']['op'] = DELETE
-        prev_3['1']['tx_hash'] = tx_hash
-        prev_3['1']['submitted_on'] = submitted_on
-
-    elif not prev_3['2']['op']:
-        prev_3['2']['op'] = DELETE
-        prev_3['2']['tx_hash'] = tx_hash
-        prev_3['2']['submitted_on'] = submitted_on
-    
-    return prev_3
 
 
 def map_nested_dicts_modify(ob, func):

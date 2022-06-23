@@ -194,12 +194,36 @@ def write_col_docs(name):
                         return
             
                 all_docs[doc.id] = to_use
-            
+    
+    elif name == 'dead_sick':
+        for doc in docs:
+            print("checking...", doc.id)
+            vals = doc.to_dict()
+
+            to_use = {
+                'image_id': vals['imageId'],
+                'image_url': vals['url'] if 'url' in vals else vals['photoURL'],
+                'location': vals['place'].upper(),
+                'reason': vals['reason'].upper().strip(),
+                'by': vals['submittedBy'].upper(),
+                'date': int(vals['date'].timestamp()),
+                'number': int(vals['chickenNo']),
+                'submitted_on': int(vals['submittedOn'].timestamp()),
+                'section': vals['section'].upper()
+            }
+
+            print(to_use)
+            for k in to_use:
+                if to_use[k] is None:
+                    print(k, "is none")
+                    return
+            all_docs[doc.id] = to_use
+        
 
     with open(f"{name}.json", "w") as outfile:
         json.dump(all_docs, outfile)
 
-#write_col_docs('blockchain')
+#write_col_docs('dead_sick')
 
 def flatten(xss):
     return [x for xs in xss for x in xs]
@@ -261,4 +285,4 @@ def create_instr(name):
 
 #fin = create_instr('sales')+create_instr('purchases')+create_instr('eggs_collected')
 #print(create_instr('eggs_collected'))
-#print(create_instr('trade'))
+#print(create_instr('ds'))
