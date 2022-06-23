@@ -59,4 +59,4 @@ class Opcodes(AutoName):
     INCRBAL = auto()
     TRAYSAVAIL = auto()
 
-#print(Opcodes.PUSH.value)
+print(Opcodes.TRAYSAVAIL.value)

@@ -48,6 +48,10 @@ class VM:
                 k += 2
             else:
                 k += 1
+        if len(jumpif_list) != len(jumpdest_list):
+            log.warning("Analysing jump instructions failed")
+            return
+        
         self.analysed_code = {str(jumpif_list[i]): jumpdest_list[i] for i in range(len(jumpif_list))}
 
 
@@ -59,7 +63,7 @@ class VM:
     
                 return True
             case Opcodes.POP.value:
-                return True
+                return self.stack.size() > 0
             case Opcodes.ADD.value:
                 return self.stack.size() > 1 and isinstance(self.stack.peek(), Decimal) and isinstance(self.stack.peek2(), Decimal)
             case Opcodes.SUB.value:
@@ -362,7 +366,7 @@ class VM:
                     case _:
                         return False
             case Opcodes.DENTRY.value:
-                return self.stack.size() > 1 and isinstance(self.stack.peek(), str) and isinstance(self.stack.peek2(), str) and self.stack.peek() in self.cache_state[self.stack.peek2()] if self.stack.peek2() in EVENTC.values() else False
+                return self.stack.size() > 1 and isinstance(self.stack.peek(), str) and isinstance(self.stack.peek2(), str) and self.stack.peek2() in EVENTC.values() and self.stack.peek() in self.cache_state[self.stack.peek2()]
             case Opcodes.PREPFINALISE.value:
                 new_l = [x for x in self.stack.get_stack() if isinstance(x, str)]
                 if len(new_l) == 0:
