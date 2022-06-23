@@ -3,7 +3,7 @@ import sys
 import random
 from opcodes import Opcodes
 
-total_ops = 29
+total_ops = 36
 
 with atheris.instrument_imports():
     from vm import VM
@@ -50,7 +50,7 @@ def CustomMutator(data, max_size, seed):
 @atheris.instrument_func
 def TestVM(input_bytes):
   fdp = atheris.FuzzedDataProvider(input_bytes)
-  input_list = fdp.ConsumeIntListInRange(200, 0, total_ops+(len(valid_strings)))
+  input_list = fdp.ConsumeIntListInRange(1000, 0, total_ops+(len(valid_strings)))
   i = 0
   for x in range(len(input_list)):
     if i+1 < len(input_list):
@@ -73,8 +73,9 @@ def TestVM(input_bytes):
       break
 
   vm_ = VM(input_list)
+  vm_.analyse()
   vm_.execute()
 
 
-atheris.Setup(sys.argv, TestVM, custom_mutator=CustomMutator)
+atheris.Setup(sys.argv, TestVM)
 atheris.Fuzz()
