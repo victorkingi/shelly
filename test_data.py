@@ -243,7 +243,7 @@ def create_instr(name):
             temp = method(values=v)
             i += 1
 
-            if first and name == 'sales':
+            if first and name == 'eggs_collected':
                 first = False
             elif name != 'eggs_collected':
                 temp = temp[15:]

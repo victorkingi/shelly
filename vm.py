@@ -412,6 +412,8 @@ class VM:
                             return True
 
                 return False
+            case Opcodes.TRAYSAVAIL.value:
+                return self.stack.size() > 1 and isinstance(self.stack.peek(), Decimal) and isinstance(self.stack.peek2(), Decimal)
             case _:
                 log.warning(f"Invalid opcode provided, {instr}")
                 return False

@@ -833,6 +833,7 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
     i = 0
     
     if collection_name == EVENTC[TRADE]:
+        cache_state[collection_name]['state']['balances'] = {}
         for user in cache_accounts:
             if user == 'BLACK_HOLE':
                 cache_state[collection_name]['state']['balances'][user] = Decimal(MAX_EMAX)
@@ -1475,7 +1476,7 @@ def calculate_main_state(stack=None, memory=None, pc=None, analysed=None):
     all_trays_sold = [Decimal(v['tray_no']) for k, v in cache_state['sales'].items() if k != 'state' and k != 'prev_states']
     all_trays_collected = [v['trays_collected'] for k, v in cache_state['eggs_collected'].items() if k != 'state' and k != 'prev_states']
 
-    all_trays_sold = reduce(lambda x, y: x+y, all_trays_sold, Decimal(0))
+    all_trays_sold = f'{reduce(lambda x, y: x+y, all_trays_sold, Decimal(0))},0'
     all_trays_collected = reduce(reduce_add_eggs, all_trays_collected, "0,0")
     
     cache_state['world_state']['main']['week_laying_percent'][current_week] = week_laying_percent
@@ -1484,7 +1485,8 @@ def calculate_main_state(stack=None, memory=None, pc=None, analysed=None):
     cache_state['world_state']['main']['week_profit'] = week_profit
     cache_state['world_state']['main']['month_profit'] = month_profit
     cache_state['world_state']['main']['total_birds'] = total_birds
-    cache_state['world_state']['main']['trays_available'] = get_eggs_diff(all_trays_collected, f'{all_trays_sold},0')[0]
+    cache_state['world_state']['main']['trays_available'] = get_eggs_diff(all_trays_collected, all_trays_sold)[0]
+
     to_hash_list = [v['root_hash'] for x in cache_state for y, v in cache_state[x].items() if x != 'world_state' and y == 'state']
     stack.push(to_hash_list)
     stack.push(Decimal(len(to_hash_list)))
@@ -1502,6 +1504,25 @@ def balance(stack=None, memory=None, pc=None, analysed=None):
     return stack, memory, pc, cache_state, cache_accounts
 
 
+# takes unix epoch and checks if enough trays existed for the sale to be valid
+def is_sale_trays_safe(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: TRAYSAVAIL")
+    pc += 1
+
+    tray_no = stack.pop()
+    unix_epoch = stack.pop()
+
+    all_trays_sold = [Decimal(v['tray_no']) for k, v in cache_state['sales'].items() if k != 'state' and k != 'prev_states' and v['date']['unix'] <= unix_epoch]
+    all_trays_collected = [v['trays_collected'] for k, v in cache_state['eggs_collected'].items() if k != 'state' and k != 'prev_states' and v['date']['unix'] <= unix_epoch]
+
+    all_trays_sold = f'{reduce(lambda x, y: x+y, all_trays_sold, Decimal(0))},0'
+    all_trays_collected = reduce(reduce_add_eggs, all_trays_collected, "0,0")
+    remain = get_eggs_diff(all_trays_collected, all_trays_sold)[0]
+    remain = get_eggs_diff(remain, f'{tray_no},0')[1]
+
+    stack.push(Decimal(0) if remain >= Decimal(0) else Decimal(1))
+
+    return stack, memory, pc, cache_state, cache_accounts
 
 # get all dead txs with time less than or == given push laying percent
 def laying_percent(stack=None, memory=None, pc=None, analysed=None):
@@ -1759,6 +1780,7 @@ inst_mapping = {
     str(Opcodes.UPDATECACHE.value): update_cache,
     str(Opcodes.STATE.value): get_state,
     str(Opcodes.LAYINGPERCENT.value): laying_percent,
+    str(Opcodes.TRAYSAVAIL.value): is_sale_trays_safe,
     str(Opcodes.CENTRY.value): create_entry,
     str(Opcodes.CADDR.value): create_address,
     str(Opcodes.DADDR.value): delete_address,

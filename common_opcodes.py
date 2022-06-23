@@ -5,7 +5,7 @@ class CommonOps:
     def __init__(self):
         pass
     
-    
+
     def no_create_op(self, values={}):
         return []
 
@@ -32,6 +32,11 @@ class CommonOps:
             [Opcodes.UPDATECACHE.value],
             [Opcodes.UPDATECACHE.value],
             [Opcodes.UPDATECACHE.value],
+
+            [Opcodes.PUSH.value, values['date']],
+            [Opcodes.PUSH.value, values['tray_no']],
+            [Opcodes.TRAYSAVAIL.value],
+            [Opcodes.PANIC.value],
 
             [Opcodes.PUSH.value, values['section']],
             [Opcodes.CADDR.value],

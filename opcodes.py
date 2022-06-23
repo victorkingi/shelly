@@ -57,5 +57,6 @@ class Opcodes(AutoName):
     POP = auto()
     DECRBAL = auto()
     INCRBAL = auto()
+    TRAYSAVAIL = auto()
 
 #print(Opcodes.PUSH.value)
