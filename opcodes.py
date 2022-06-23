@@ -53,6 +53,9 @@ class Opcodes(AutoName):
     # terminate
     STOP = auto()
     PANIC = auto()
+
     POP = auto()
+    DECRBAL = auto()
+    INCRBAL = auto()
 
 #print(Opcodes.UPROOTHASH.value)

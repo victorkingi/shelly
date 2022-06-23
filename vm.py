@@ -22,113 +22,8 @@ class VM:
         self.stack = Stack()
         self.memory = { 'TOTALCREATES': 0, 'TOTALDELETES': 0, 'TOTALREPLACE': 0, 'REPLACED': {}, 'ADDED': {}, 'DELETES': {}}
         self.pc = 0             # program counter
-        self.cache_state = {
-            'world_state': {
-                'main': {},
-                'prev_states': {}
-            },
-            'sales': {
-                'state': {
-                    'root_hash': '',
-                    'all_tx_hashes': {},
-                    'prev_3_states': {'0': {
-                        'op': '',
-                        'tx_hash': '',
-                        'submitted_on': {'unix': 0, 'locale': ''}
-                    }, '1': {
-                        'op': '',
-                        'tx_hash': '',
-                        'submitted_on': {'unix': 0, 'locale': ''}
-                    }, '2': {
-                        'op': '',
-                        'tx_hash': '',
-                        'submitted_on': {'unix': 0, 'locale': ''}
-                    }}
-                },
-                'prev_states': {}
-            },
-            'purchases': {
-                'state': {
-                    'root_hash': '',
-                    'all_tx_hashes': {},
-                    'prev_3_states': {'0': {
-                        'op': '',
-                        'tx_hash': '',
-                        'submitted_on': {'unix': 0, 'locale': ''}
-                    }, '1': {
-                        'op': '',
-                        'tx_hash': '',
-                        'submitted_on': {'unix': 0, 'locale': ''}
-                    }, '2': {
-                        'op': '',
-                        'tx_hash': '',
-                        'submitted_on': {'unix': 0, 'locale': ''}
-                    }}
-                },
-                'prev_states': {}
-            },
-            'eggs_collected': {
-                'state': {
-                    'root_hash': '',
-                    'all_tx_hashes': {},
-                    'prev_3_states': {'0': {
-                        'op': '',
-                        'tx_hash': '',
-                        'submitted_on': {'unix': 0, 'locale': ''}
-                    }, '1': {
-                        'op': '',
-                        'tx_hash': '',
-                        'submitted_on': {'unix': 0, 'locale': ''}
-                    }, '2': {
-                        'op': '',
-                        'tx_hash': '',
-                        'submitted_on': {'unix': 0, 'locale': ''}
-                    }}
-                },
-                'prev_states': {}
-            },
-            'dead_sick': {
-            'state': {
-                    'root_hash': '',
-                    'all_tx_hashes': {},
-                    'prev_3_states': {'0': {
-                        'op': '',
-                        'tx_hash': '',
-                        'submitted_on': {'unix': 0, 'locale': ''}
-                    }, '1': {
-                        'op': '',
-                        'tx_hash': '',
-                        'submitted_on': {'unix': 0, 'locale': ''}
-                    }, '2': {
-                        'op': '',
-                        'tx_hash': '',
-                        'submitted_on': {'unix': 0, 'locale': ''}
-                    }}
-                },
-                'prev_states': {}
-            },
-            'trades': {
-                'state': {
-                    'root_hash': '',
-                    'all_tx_hashes': {},
-                    'prev_3_states': {'0': {
-                        'op': '',
-                        'tx_hash': '',
-                        'submitted_on': {'unix': 0, 'locale': ''}
-                    }, '1': {
-                        'op': '',
-                        'tx_hash': '',
-                        'submitted_on': {'unix': 0, 'locale': ''}
-                    }, '2': {
-                        'op': '',
-                        'tx_hash': '',
-                        'submitted_on': {'unix': 0, 'locale': ''}
-                    }}
-                },
-                'prev_states': {}
-            }
-        }
-        self.cache_accounts = {'BLACK_HOLE': Decimal(MAX_EMAX), 'ANNE': Decimal(4000) } # main money supplier
+        self.cache_state = {}
+        self.cache_accounts = {}
         self.analysed_code = {}
         self.is_safe = self.check_safety()
 
@@ -213,6 +108,10 @@ class VM:
                 return False
             case Opcodes.NOW.value:
                 return True
+            case Opcodes.INCRBAL.value:
+                return self.stack.size() > 1 and isinstance(self.stack.peek(), str) and isinstance(self.stack.peek2(), Decimal) and self.stack.peek() in self.cache_accounts
+            case Opcodes.DECRBAL.value:
+                return self.stack.size() > 1 and isinstance(self.stack.peek(), str) and isinstance(self.stack.peek2(), Decimal) and self.stack.peek() in self.cache_accounts
             case Opcodes.SWAP.value:
                 # can swap a decimal with a string
                 return self.stack.size() > 1

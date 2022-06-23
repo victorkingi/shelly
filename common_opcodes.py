@@ -66,6 +66,14 @@ class CommonOps:
             [Opcodes.LT.value],
             [Opcodes.ISZERO.value],
             [Opcodes.PANIC.value],
+
+            [Opcodes.PUSH.value, values['amount']],
+            [Opcodes.PUSH.value, 'BLACK_HOLE'],
+            [Opcodes.DECRBAL.value],
+            [Opcodes.PUSH.value, values['amount']],
+            [Opcodes.PUSH.value, values['by']],
+            [Opcodes.INCRBAL.value],
+
             [Opcodes.NOW.value],
             [Opcodes.PUSH.value, values['amount']],
             [Opcodes.PUSH.value, 'SHA256'],
@@ -90,6 +98,14 @@ class CommonOps:
             [Opcodes.LT.value],
             [Opcodes.ISZERO.value],
             [Opcodes.PANIC.value],
+
+            [Opcodes.PUSH.value, values['amount']],
+            [Opcodes.PUSH.value, 'BLACK_HOLE'],
+            [Opcodes.DECRBAL.value],
+            [Opcodes.PUSH.value, values['amount']],
+            [Opcodes.PUSH.value, values['section']],
+            [Opcodes.INCRBAL.value],
+
             [Opcodes.NOW.value],
             [Opcodes.PUSH.value, values['amount']],
             [Opcodes.PUSH.value, 'SHA256'],
@@ -188,6 +204,14 @@ class CommonOps:
             [Opcodes.LT.value],
             [Opcodes.ISZERO.value],
             [Opcodes.PANIC.value],
+
+            [Opcodes.PUSH.value, values['amount']],
+            [Opcodes.PUSH.value, 'BLACK_HOLE'],
+            [Opcodes.DECRBAL.value],
+            [Opcodes.PUSH.value, values['amount']],
+            [Opcodes.PUSH.value, values['section']],
+            [Opcodes.INCRBAL.value],
+
             [Opcodes.NOW.value],
             [Opcodes.PUSH.value, values['amount']],
             [Opcodes.PUSH.value, ''],
@@ -433,6 +457,13 @@ class CommonOps:
             [Opcodes.JUMPDEST.value],
             [Opcodes.PUSH.value, values['to']],
             [Opcodes.CADDR.value],
+
+            [Opcodes.PUSH.value, values['amount']],
+            [Opcodes.PUSH.value, values['from']],
+            [Opcodes.DECRBAL.value],
+            [Opcodes.PUSH.value, values['amount']],
+            [Opcodes.PUSH.value, values['to']],
+            [Opcodes.INCRBAL.value],
 
             [Opcodes.NOW.value],
             [Opcodes.PUSH.value, values['amount']],

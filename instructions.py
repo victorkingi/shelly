@@ -362,7 +362,7 @@ def stop(stack=None, memory=None, pc=None, analysed=None):
                 'prev_states': {}
             }
         }
-        empty_accounts = {'BLACK_HOLE': Decimal(MAX_EMAX) }
+        empty_accounts = {'BLACK_HOLE': Decimal(MAX_EMAX), 'ANNE': Decimal(4000) }
 
         if empty_accounts == cache_accounts and empty_state == cache_state:
             # successful exit
@@ -384,7 +384,6 @@ def stop(stack=None, memory=None, pc=None, analysed=None):
             
             stack.push(val)
             return stack, memory, -1, cache_state, cache_accounts
-
 
     if stack.size():
         log.error(f"Stack still contains: {stack.get_stack()}")
@@ -1230,10 +1229,39 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
     is_first = True
     next_week = Decimal(0)
     next_month = Decimal(0)
-
-    cache_state['trades']['state']['balances'] = cache_accounts
     i = 0
     
+    if collection_name == EVENTC[TRADE]:
+        for user in cache_accounts:
+            if user == 'BLACK_HOLE':
+                cache_state[collection_name]['state']['balances'][user] = Decimal(MAX_EMAX)
+                continue
+            elif user == 'ANNE':
+                cache_state[collection_name]['state']['balances'][user] = Decimal(4000)
+            else:    
+                cache_state[collection_name]['state']['balances'][user] = Decimal(0) # initialise all
+
+            for id in cache_state[collection_name]:
+                if id == 'state' or id == 'prev_states':
+                    continue
+            
+                tx = cache_state[collection_name][id]
+
+                if tx['to'] == user:
+                    cache_state[collection_name]['state']['balances'][user] += Decimal(str(tx['amount']))
+                        
+                elif tx['from'] == user:
+                    cache_state[collection_name]['state']['balances'][user] -= Decimal(str(tx['amount']))
+            
+            if cache_state[collection_name]['state']['balances'][user] != cache_accounts[user]:
+                log.error(f"balances do not match for address {user}, state: {cache_state[collection_name]['state']['balances'][user]}, acc: {cache_accounts[user]}")
+                return None, None, None, None, None
+            
+            if cache_state[collection_name]['state']['balances'][user] < Decimal(0):
+                log.error(f"address {user} balance is negative {cache_state[collection_name]['state']['balances'][user]}")
+                return None, None, None, None, None
+
+
     for id in cache_state[collection_name]:
         if id == 'state' or id == 'prev_states':
             continue
@@ -1502,19 +1530,6 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
                     month_dict[f'spent_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] = amount
                     month_dict[f'items_bought_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] = tx['item_no']
 
-        elif collection_name == EVENTC[TRADE]:
-            for user in cache_accounts:
-                if tx['to'] == user:
-                    cache_state[collection_name]['state']['balances'][user] += Decimal(str(tx['amount']))
-                    
-                elif tx['from'] == user:
-                    cache_state[collection_name]['state']['balances'][user] -= Decimal(str(tx['amount']))
-                    
-
-            if [k for k, v in cache_state[collection_name]['state']['balances'].items() if v < Decimal(0)]:
-                log.warning(f"A user balance is negative, {cache_state[collection_name]['state']['balances']}")
-                return None, None, None, None, None 
-
         elif collection_name == EVENTC[EGGS]:
             # after an eggs entry, increase values
             amount = tx['a1'] + tx['a2'] + tx['b1'] + tx['b2'] + tx['c1'] + tx['c2'] + tx['house']
@@ -1638,6 +1653,36 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
                 state['total_dead'] += 1
 
         i += 1
+
+    return stack, memory, pc, cache_state, cache_accounts
+
+
+def incr_balance(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: INCRBAL")
+    pc += 1
+
+    address = stack.pop()
+    amount = stack.pop()
+    cache_accounts[address] += amount
+
+    log.info(f"New balance of {address}: {cache_accounts[address]}")
+
+    return stack, memory, pc, cache_state, cache_accounts
+
+
+def decr_balance(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: DECRBAL")
+    pc += 1
+
+    address = stack.pop()
+    amount = stack.pop()
+    temp = cache_accounts[address] - amount
+    if temp < Decimal(0):
+        log.error(f"Balance decrement became negative addr: {address} from {cache_accounts[address]}, amount {amount}")
+        return None, None, None, None, None
+    
+    cache_accounts[address] -= amount
+    log.info(f"New balance of {address}: {cache_accounts[address]}")
 
     return stack, memory, pc, cache_state, cache_accounts
 
@@ -2102,6 +2147,8 @@ inst_mapping = {
     str(Opcodes.CENTRY.value): create_entry,
     str(Opcodes.CADDR.value): create_address,
     str(Opcodes.DADDR.value): delete_address,
+    str(Opcodes.DECRBAL.value): decr_balance,
+    str(Opcodes.INCRBAL.value): incr_balance,
     str(Opcodes.DENTRY.value): delete_entry,
     str(Opcodes.NOW.value): timestamp_now,
     str(Opcodes.CALCSTATE.value): full_calculate_new_state,
