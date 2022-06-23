@@ -5,8 +5,10 @@ class CommonOps:
     def __init__(self):
         pass
     
+    
     def no_create_op(self, values={}):
         return []
+
 
     def create_sales_instructions(self, values={
             'tray_no': 5,

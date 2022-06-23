@@ -117,6 +117,51 @@ def increment_eggs(val1, val2):
     return None, None
 
 
+def reduce_add_eggs(val1, val2):
+    if isinstance(val1, str) and isinstance(val2, str):
+        val1 = val1.split(',')
+        val2 = val2.split(',')
+        val1 = Decimal(val1[0])*eggs_in_tray+Decimal(val1[1])
+        val2 = Decimal(val2[0])*eggs_in_tray+Decimal(val2[1])
+        res = val1+val2
+        res_str = res/eggs_in_tray
+        res_trays = int(res_str)
+        eggs_left = (res_str-res_trays)*eggs_in_tray
+        eggs_left = Decimal(f'{eggs_left}')
+        return f'{res_trays},{round(eggs_left)}'
+
+    if isinstance(val1, str) and isinstance(val2, Decimal):
+        val1 = val1.split(',')
+        val1 = Decimal(val1[0])*eggs_in_tray+Decimal(val1[1])
+        res = val1+val2
+        res_str = res/eggs_in_tray
+        res_trays = int(res_str)
+        eggs_left = (res_str-res_trays)*eggs_in_tray
+        eggs_left = Decimal(f'{eggs_left}')
+        return f'{res_trays},{round(eggs_left)}'
+
+    if isinstance(val1, Decimal) and isinstance(val2, str):
+        val2 = val2.split(',')
+        val2 = Decimal(val2[0])*eggs_in_tray+Decimal(val2[1])
+        res = val1+val2
+        res_str = res/eggs_in_tray
+        res_trays = int(res_str)
+        eggs_left = (res_str-res_trays)*eggs_in_tray
+        eggs_left = Decimal(f'{eggs_left}')
+        return f'{res_trays},{round(eggs_left)}'
+
+    if isinstance(val1, Decimal) and isinstance(val2, Decimal):
+        res = val1+val2
+        res_str = res/eggs_in_tray
+        res_trays = int(res_str)
+        eggs_left = (res_str-res_trays)*eggs_in_tray
+        eggs_left = Decimal(f'{eggs_left}')
+        return f'{res_trays},{round(eggs_left)}'
+    
+    log.error(f"Failed to increment eggs, got unknown types, {type(val1)}, {type(val2)}")
+    return None
+
+
 def map_nested_dicts_modify(ob, func):
     for k, v in ob.items():
         if isinstance(v, collections.abc.Mapping):

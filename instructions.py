@@ -1172,7 +1172,7 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
                 current_week_dict = state['week_trays_and_exact'][str(temp_next_week)]
 
                 def f(k, v):
-                    return get_eggs_diff(v, (prev_week_dict[k] if k in prev_week_dict else Decimal(0)))[1]
+                    return get_eggs_diff(v, (prev_week_dict[k] if k in prev_week_dict else Decimal(0)))[0]
 
                 week_val_diff = {k: f(k, v) for k, v in current_week_dict.items()}
                 state['change_week'][f'{temp_next_week}'] = week_val_diff
@@ -1222,7 +1222,7 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
                 current_month_dict = state['month_trays_and_exact'][str(temp_next_month)]
 
                 def f(k, v):
-                    return get_eggs_diff(v, (prev_month_dict[k] if k in prev_month_dict else Decimal(0)))[1]
+                    return get_eggs_diff(v, (prev_month_dict[k] if k in prev_month_dict else Decimal(0)))[0]
 
                 month_val_diff = {k: f(k, v) for k, v in current_month_dict.items()}
                 state['change_month'][f'{temp_next_month}'] = month_val_diff
@@ -1354,6 +1354,7 @@ def update_root_hash(stack=None, memory=None, pc=None, analysed=None):
         return stack, memory, pc, cache_state, cache_accounts
 
 
+# assumes all required fields are already populated
 def calculate_main_state(stack=None, memory=None, pc=None, analysed=None):
     log.debug(f"{pc}: CALCMAINSTATE")
     pc += 1
@@ -1470,14 +1471,20 @@ def calculate_main_state(stack=None, memory=None, pc=None, analysed=None):
     except InvalidOperation:
         log.error(f"Invalid Decimal Operation on monthly egg percent, value: {month_laying_percent}")
         return None, None, None, None, None
+
+    all_trays_sold = [Decimal(v['tray_no']) for k, v in cache_state['sales'].items() if k != 'state' and k != 'prev_states']
+    all_trays_collected = [v['trays_collected'] for k, v in cache_state['eggs_collected'].items() if k != 'state' and k != 'prev_states']
+
+    all_trays_sold = reduce(lambda x, y: x+y, all_trays_sold, Decimal(0))
+    all_trays_collected = reduce(reduce_add_eggs, all_trays_collected, "0,0")
     
     cache_state['world_state']['main']['week_laying_percent'][current_week] = week_laying_percent
     cache_state['world_state']['main']['month_laying_percent'][current_month] = month_laying_percent
-    
     cache_state['world_state']['main']['total_profit'] = net_profit
     cache_state['world_state']['main']['week_profit'] = week_profit
     cache_state['world_state']['main']['month_profit'] = month_profit
     cache_state['world_state']['main']['total_birds'] = total_birds
+    cache_state['world_state']['main']['trays_available'] = get_eggs_diff(all_trays_collected, f'{all_trays_sold},0')[0]
     to_hash_list = [v['root_hash'] for x in cache_state for y, v in cache_state[x].items() if x != 'world_state' and y == 'state']
     stack.push(to_hash_list)
     stack.push(Decimal(len(to_hash_list)))
@@ -1493,6 +1500,8 @@ def balance(stack=None, memory=None, pc=None, analysed=None):
     bal = cache_accounts.get(name, 0)
     stack.push(Decimal(f'{bal}'))
     return stack, memory, pc, cache_state, cache_accounts
+
+
 
 # get all dead txs with time less than or == given push laying percent
 def laying_percent(stack=None, memory=None, pc=None, analysed=None):
