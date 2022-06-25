@@ -73,6 +73,9 @@ cache_state = {
 }
 cache_accounts = {'BLACK_HOLE': Decimal(MAX_EMAX), 'ANNE': Decimal(4000) }
 cache_deleted = {} # no need to keep track of this as entries are only dumped into it
+cache_ui_txs = {}
+cache_verification_data = {}
+cache_dashboard_data = {}
 
 
 def push(elem=None, stack=None, memory=None, pc=None, analysed=None):
@@ -376,11 +379,13 @@ def jumpif(stack=None, memory=None, pc=None, analysed=None):
     
     return stack, memory, pc, cache_state, cache_accounts
 
+
 def jumpdes(stack=None, memory=None, pc=None, analysed=None):
     log.debug(f"{pc}: JUMPDEST")
     pc += 1
     
     return stack, memory, pc, cache_state, cache_accounts
+
 
 def get_state(stack=None, memory=None, pc=None, analysed=None):
     log.debug(f"{pc}: UPDATESTATE")
@@ -716,7 +721,7 @@ def create_entry(stack=None, memory=None, pc=None, analysed=None):
 
     elif entry_name == TRADE:
         cache_state[EVENTC[TRADE]]['temp'] = {}
-        order = [ 'submitted_on', 'by', 'tx_hash', 'from', 'to', 'purchase_hash', 'sale_hash', 'amount', 'date']
+        order = [ 'submitted_on', 'by', 'tx_hash', 'from', 'to', 'purchase_hash', 'sale_hash', 'amount', 'date', 'reason']
         tx_hash = ''
         for id in order:
             val = stack.pop()
@@ -1524,6 +1529,7 @@ def is_sale_trays_safe(stack=None, memory=None, pc=None, analysed=None):
 
     return stack, memory, pc, cache_state, cache_accounts
 
+
 # get all dead txs with time less than or == given push laying percent
 def laying_percent(stack=None, memory=None, pc=None, analysed=None):
     log.debug(f"{pc}: LAYINGPERCENT")
@@ -1574,8 +1580,154 @@ def laying_percent(stack=None, memory=None, pc=None, analysed=None):
 
     return stack, memory, pc, cache_state, cache_accounts
 
+
+# only called after update cache
+def update_ui_entries(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: UIENTRIES")
+    pc += 1
+
+    for col_name in EVENTC.values():
+        type = ''
+        match col_name:
+            case 'sales':
+                type = 'Sale'
+            case 'purchases':
+                type = 'Purchase'
+            case 'trades':
+                type = 'Trade'
+            case 'dead_sick':
+                type = 'Dead or Sick'
+            case 'eggs_collected':
+                type = 'Eggs Collected'
+            case _:
+                log.error(f"No match case found for {col_name}")
+                return None, None, None, None, None
+
+        for hash in cache_state[col_name]:
+            if hash == 'state' or hash == 'prev_states':
+                continue
+            cache_ui_txs[hash] = {
+                'date': cache_state[col_name][hash]['date']['unix'],
+                'hash': hash,
+                'status': Decimal(1),
+                'submitted_on': cache_state[col_name][hash]['submitted_on']['unix'],
+                'type': type
+            }
+    log.info(f"UI transactions updated")
+
+    return stack, memory, pc, cache_state, cache_accounts
+
+
+# only called after update cache
+def update_verification_data(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: VERIFYCOL")
+    pc += 1
+
+    valid_hashes = []
+
+    for col_name in EVENTC.values():
+        if col_name == 'eggs_collected':
+            cache_verification_data['trays'] = cache_state[col_name]['state']['trays_collected_to_timestamp']
+        
+        for hash in cache_state[col_name]:
+            if hash == 'state' or hash == 'prev_states':
+                continue
+            valid_hashes.append(hash)
+
+    cache_verification_data['hashes'] = valid_hashes
+    print(cache_verification_data)
+        
+    log.info(f"Verification data updated")
+
+    return stack, memory, pc, cache_state, cache_accounts
+
+
+# only called after update cache
+def update_dashboard_data(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: DASHBOARD")
+    pc += 1
+
+    # get last 2 weeks and month profit
+    def get_last_2_profit(period):
+        all = cache_state['world_state']['main'][f'{period}_profit'].keys()
+        all = map(lambda x: int(x), all)
+        all = sorted(all)
+        latest = all[-1]
+        prev = all[-2]
+        return latest, prev
+
+    week_profit = {
+        str(get_last_2_profit('week')[0]): cache_state['world_state']['main']['week_profit'][str(get_last_2_profit('week')[0])],
+        str(get_last_2_profit('week')[1]): cache_state['world_state']['main']['week_profit'][str(get_last_2_profit('week')[1])],
+    }
+    month_profit = {
+        str(get_last_2_profit('month')[0]): cache_state['world_state']['main']['month_profit'][str(get_last_2_profit('month')[0])],
+        str(get_last_2_profit('month')[1]): cache_state['world_state']['main']['month_profit'][str(get_last_2_profit('month')[1])],
+    }
+    total_birds = cache_state['world_state']['main']['total_birds']
+    withdraw_amount = {
+        'JEFF': cache_state['world_state']['main']['available_to_withdraw']['JEFF'],
+        'VICTOR': cache_state['world_state']['main']['available_to_withdraw']['VICTOR'],
+        'BABRA': cache_state['world_state']['main']['available_to_withdraw']['BABRA']
+    }
+    bank_balance = cache_state['trades']['state']['balances']['BANK']
+    amount_owe = {
+        'VICTOR': cache_state['trades']['state']['balances']['VICTOR'],
+        'JEFF': cache_state['trades']['state']['balances']['JEFF'],
+        'PURITY': cache_state['trades']['state']['balances']['PURITY'],
+        'BABRA': cache_state['trades']['state']['balances']['BABRA']
+    }
+
+    def get_laying_change_percent(period):
+        laying_keys = cache_state['world_state']['main'][f'{period}_laying_percent'].keys()
+        laying_percent = cache_state['world_state']['main'][f'{period}_laying_percent'][max(laying_keys)]
+        change = get_eggs(cache_state['eggs_collected']['state']['change_week'][max(laying_keys)]['trays_collected'])[1]
+        in_seconds = 7 * 24 * 60 * 60
+        if period == 'month':
+            in_seconds = 28 * 24 * 60 * 60
+        
+        prev_val = int(max(laying_keys)) - in_seconds
+        change_percent = (change / get_eggs(cache_state['eggs_collected']['state'][f'{period}_trays_and_exact'][str(prev_val)]['trays_collected'])[1]) * Decimal(100)
+        return [change_percent, laying_percent]
+
+    laying_data = {
+        'week': get_laying_change_percent('week'),
+        'month': get_laying_change_percent('month')
+    }
+    trays_avail = cache_state['world_state']['main']['trays_available']
+
+    sorted_tuples = sorted(cache_state['trades'].items(), key=lambda item: item[1]['date']['unix'] if 'date' in item[1] and 'unix' in item[1]['date'] else Decimal(0))
+    cache_state['trades'] = {k: v for k, v in sorted_tuples}
+    last_trades = {}
+    i = 0
+
+    for x in cache_state['trades']:
+        if x == 'state' or x == 'prev_states':
+            continue
+        last_trades[x] = cache_state['trades'][x]
+        i += 1
+        if i == 5:
+            break
+
+    cache_dashboard_data = {
+        'week_profit': week_profit,
+        'month_profit': month_profit,
+        'birds': total_birds,
+        'withdraw': withdraw_amount,
+        'bank': bank_balance,
+        'owe': amount_owe,
+        'laying': laying_data,
+        'trays_avail': trays_avail,
+        'last_trades': last_trades 
+    }
+
+    log.info(f"Dashboard data updated")
+
+    return stack, memory, pc, cache_state, cache_accounts
+
+
 # each week and month is represented by a timestamp
-# month is current_timestamp+30days, week is current_timestamp+7days
+# month is current_timestamp+28days, week is current_timestamp+7days
 def initialise():
     print("initialising...")
     all_collections = []
@@ -1756,7 +1908,6 @@ def initialise():
 
 #initialise()
 
-
 inst_mapping = {
     str(Opcodes.PUSH.value): push,
     str(Opcodes.POP.value): pop,
@@ -1778,6 +1929,9 @@ inst_mapping = {
     str(Opcodes.ROOTHASH.value): root_hash,
     str(Opcodes.SHA256.value): sha256,
     str(Opcodes.UPDATECACHE.value): update_cache,
+    str(Opcodes.VERIFYCOL.value): update_verification_data,
+    str(Opcodes.UIENTRIES.value): update_ui_entries,
+    str(Opcodes.DASHBOARD.value): update_dashboard_data,
     str(Opcodes.STATE.value): get_state,
     str(Opcodes.LAYINGPERCENT.value): laying_percent,
     str(Opcodes.TRAYSAVAIL.value): is_sale_trays_safe,

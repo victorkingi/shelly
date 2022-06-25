@@ -184,6 +184,7 @@ def write_col_docs(name):
                     'amount': tx['amount'],
                     'by': users[tx['fromAddress']],
                     'date': valid_date,
+                    'reason': '',
                     'submitted_on': valid_date
                 }
 
@@ -223,7 +224,7 @@ def write_col_docs(name):
     with open(f"{name}.json", "w") as outfile:
         json.dump(all_docs, outfile)
 
-#write_col_docs('dead_sick')
+#write_col_docs('blockchain')
 
 def flatten(xss):
     return [x for xs in xss for x in xs]

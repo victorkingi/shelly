@@ -324,9 +324,9 @@ class VM:
                         log.warning(f"stack size not 14 or greater but {self.stack.size()}")
                         return False
                     case 'TRADE':
-                        if self.stack.size() >= 10:
-                            values = self.stack.peek_n(10)
-                            # [ 'entry_name', 'submitted_on', 'by', 'tx_hash', 'from', 'to', 'purchase_hash', 'sale_hash', 'amount', 'date']
+                        if self.stack.size() >= 11:
+                            values = self.stack.peek_n(11)
+                            # [ 'entry_name', 'submitted_on', 'by', 'tx_hash', 'from', 'to', 'purchase_hash', 'sale_hash', 'amount', 'date', 'reason']
                             values.reverse()
                             values.pop(0) # we don't need entry_name
 
@@ -340,6 +340,7 @@ class VM:
                             bool_list.append(isinstance(values[6], str))
                             bool_list.append(isinstance(values[7], Decimal)  and values[7] > 0)
                             bool_list.append(isinstance(values[8], Decimal)  and values[8] >= EARLIEST_VALID_YEAR and values[8] <= Decimal(f'{time.time()}'))
+                            bool_list.append(isinstance(values[9], str))
 
                             if isinstance(values[5], str) and isinstance(values[6], str) and values[5] and values[6]:
                                 log.warning(f"sale hash and purchase hash not empty, contains, purchase hash: {values[5]}, sale hash: {values[6]}")
@@ -361,7 +362,7 @@ class VM:
                                 log.warning(f"reduced bool list not True but {res} of type {type(res)}")
                                 return False
 
-                        log.warning(f"stack size not 10 or greater but {self.stack.size()}")
+                        log.warning(f"stack size not 11 or greater but {self.stack.size()}")
                         return False
                     case _:
                         return False
@@ -418,6 +419,18 @@ class VM:
                 return False
             case Opcodes.TRAYSAVAIL.value:
                 return self.stack.size() > 1 and isinstance(self.stack.peek(), Decimal) and isinstance(self.stack.peek2(), Decimal)
+            case Opcodes.UIENTRIES.value:
+                if all (k in self.cache_state for k in EVENTC.values()):
+                    return True
+                return False
+            case Opcodes.VERIFYCOL.value:
+                if all (k in self.cache_state for k in EVENTC.values()):
+                    return True
+                return False
+            case Opcodes.DASHBOARD.value:
+                if all (k in self.cache_state for k in EVENTC.values()) and 'trays_available' in self.cache_state['world_state']['main']:
+                    return True
+                return False
             case _:
                 log.warning(f"Invalid opcode provided, {instr}")
                 return False

@@ -82,6 +82,7 @@ class CommonOps:
             [Opcodes.PUSH.value, values['by']],
             [Opcodes.INCRBAL.value],
 
+            [Opcodes.PUSH.value, ''],
             [Opcodes.NOW.value],
             [Opcodes.PUSH.value, values['amount']],
             [Opcodes.PUSH.value, 'SHA256'],
@@ -114,6 +115,7 @@ class CommonOps:
             [Opcodes.PUSH.value, values['section']],
             [Opcodes.INCRBAL.value],
 
+            [Opcodes.PUSH.value, ''],
             [Opcodes.NOW.value],
             [Opcodes.PUSH.value, values['amount']],
             [Opcodes.PUSH.value, 'SHA256'],
@@ -221,6 +223,7 @@ class CommonOps:
             [Opcodes.PUSH.value, values['section']],
             [Opcodes.INCRBAL.value],
 
+            [Opcodes.PUSH.value, ''],
             [Opcodes.NOW.value],
             [Opcodes.PUSH.value, values['amount']],
             [Opcodes.PUSH.value, ''],
@@ -408,6 +411,7 @@ class CommonOps:
             'amount': 3000,
             'by': 'PURITY',
             'date': 1654523316,
+            'reason': '',
             'submitted_on': 1654523316
         }):
     
@@ -446,7 +450,8 @@ class CommonOps:
             [Opcodes.PUSH.value, values['amount']],
             [Opcodes.PUSH.value, values['to']],
             [Opcodes.INCRBAL.value],
-
+            
+            [Opcodes.PUSH.value, values['reason']],
             [Opcodes.NOW.value],
             [Opcodes.PUSH.value, values['amount']],
             [Opcodes.PUSH.value, ''],

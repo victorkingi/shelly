@@ -58,5 +58,8 @@ class Opcodes(AutoName):
     DECRBAL = auto()
     INCRBAL = auto()
     TRAYSAVAIL = auto()
+    UIENTRIES = auto()
+    VERIFYCOL = auto()
+    DASHBOARD = auto()
 
-#print(Opcodes.TRAYSAVAIL.value)
+print(Opcodes.DASHBOARD.value)
