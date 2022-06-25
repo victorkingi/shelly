@@ -9,7 +9,8 @@ import time
 from opcodes import Opcodes
 from log_ import log
 from stack import Stack
-from instructions import inst_mapping
+from instructions import inst_mapping, get_dicts, db
+from util import map_nested_dicts_modify
 from constants import *
 
 EARLIEST_VALID_YEAR = 1577836800 # unix epoch of earliest reasonable data date which is 1st january midnight 2020
@@ -24,6 +25,10 @@ class VM:
         self.pc = 0             # program counter
         self.cache_state = {}
         self.cache_accounts = {}
+        self.cache_deleted = {}
+        self.cache_ui_txs = {}
+        self.cache_verification_data = {}
+        self.cache_dashboard_data = {}
         self.analysed_code = {}
         self.is_safe = self.check_safety()
 
@@ -464,7 +469,74 @@ class VM:
                             fp.write(line)
                 
                 log.info(f'Reduced file size from {round(size/(1024 * 1024), 2)} MB to {round(os.path.getsize(file_)/(1024 * 1024), 2)} MB')
-               
+
+
+    def write_to_collection(self):
+        batch = db.batch()
+
+        #replace decimal type with float
+        map_nested_dicts_modify(self.cache_state, lambda v: float(v) if isinstance(v, Decimal) else v)
+        map_nested_dicts_modify(self.cache_deleted, lambda v: float(v) if isinstance(v, Decimal) else v)
+        map_nested_dicts_modify(self.cache_accounts, lambda v: float(v) if isinstance(v, Decimal) else v)
+        map_nested_dicts_modify(self.cache_ui_txs, lambda v: float(v) if isinstance(v, Decimal) else v)
+        map_nested_dicts_modify(self.cache_verification_data, lambda v: float(v) if isinstance(v, Decimal) else v)
+        map_nested_dicts_modify(self.cache_dashboard_data, lambda v: float(v) if isinstance(v, Decimal) else v)
+        log.info("dicts sanitized")
+
+        for col_name in self.cache_state:
+            col_ref = db.collection(col_name)
+            i = 0
+            log.info(f"committing {col_name} docs...")
+            for id in self.cache_state[col_name]:
+                doc_ref = col_ref.document(id)
+                batch.set(doc_ref, self.cache_state[col_name][id])
+                batch.commit()
+                i += 1
+                log.info(f"committed entry {i} of {len(self.cache_state[col_name].keys())}")
+
+        log.info(f"all collections committed, committing extra data")
+        batch = db.batch()
+        
+        del_col_ref = db.collection('deleted')
+        acc_col_ref = db.collection('accounts')
+        tx_ui_col_ref = db.collection('tx_ui')
+        ver_data_col_ref = db.collection('verification_data')
+        dash_col_ref = db.collection('dashboard_data')
+
+        for id in self.cache_deleted:
+            doc_ref = del_col_ref.document(id)
+            batch.set(doc_ref, self.cache_deleted[id])
+        
+        batch.commit()
+        log.info("deleted docs committed")
+        
+        doc_ref = acc_col_ref.document('accounts')
+        batch.set(doc_ref, self.cache_accounts)
+
+        log.info("accounts committed")
+
+        i = 0
+        for id in self.cache_ui_txs:
+            doc_ref = tx_ui_col_ref.document(id)
+            batch.set(doc_ref, self.cache_ui_txs[id])
+            batch.commit()
+            i += 1
+            log.info(f"committed entry {i} of {len(self.cache_ui_txs.keys())}")
+
+        log.info("UI transactions committed")
+        
+        doc_ref = ver_data_col_ref.document('verification')
+        batch.set(doc_ref, self.cache_verification_data)
+
+        log.info("Verification data committed")
+        
+        for id in self.cache_dashboard_data:
+            doc_ref = dash_col_ref.document(id)
+            batch.set(doc_ref, self.cache_dashboard_data[id])
+
+        batch.commit()
+        log.info("Data written successfully")
+
 
     def execute(self):
         log.info(f"Code size: {len(self.code)}")
@@ -493,6 +565,9 @@ class VM:
 
                 # reset log with unneccessary data
                 self.clear_log()
+
+                self.cache_deleted, self.cache_ui_txs, self.cache_dashboard_data, self.cache_verification_data = get_dicts()
+                self.write_to_collection()
 
                 if self.stack.size():
                     # no update was made to firestore, hence just return computed output

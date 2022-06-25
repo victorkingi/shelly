@@ -433,6 +433,7 @@ def update_cache(stack=None, memory=None, pc=None, analysed=None):
         cache_state['world_state']['main'] = state_dict
         state_dict = collection_ref.document('prev_states').get().to_dict()
         cache_state['world_state']['prev_states'] = state_dict
+        map_nested_dicts_modify(cache_state, lambda v: Decimal(f'{v}') if isinstance(v, float) or isinstance(v, int) else v)
         log.debug("Updated main state")
         return stack, memory, pc, cache_state, cache_accounts
 
@@ -455,7 +456,10 @@ def update_cache(stack=None, memory=None, pc=None, analysed=None):
         if collection_name == EVENTC[TRADE]:
             for user in state_dict['balances']:
                 cache_accounts[user] = Decimal(str(state_dict['balances'][user]))
-    
+
+        map_nested_dicts_modify(cache_state, lambda v: Decimal(f'{v}') if isinstance(v, float) or isinstance(v, int) else v)
+        map_nested_dicts_modify(cache_accounts, lambda v: Decimal(f'{v}') if isinstance(v, float) or isinstance(v, int) else v)
+
         return stack, memory, pc, cache_state, cache_accounts
     
     else:
@@ -495,7 +499,11 @@ def update_cache(stack=None, memory=None, pc=None, analysed=None):
                     update_attempted = 1
             
             if update_attempted:
+                map_nested_dicts_modify(cache_state, lambda v: Decimal(f'{v}') if isinstance(v, float) or isinstance(v, int) else v)
+                map_nested_dicts_modify(cache_accounts, lambda v: Decimal(f'{v}') if isinstance(v, float) or isinstance(v, int) else v)
+
                 log.info("New entries added or deleted on query")
+                
                 return stack, memory, pc, cache_state, cache_accounts
             else:
                 log.info("No new entries found for update, proceeding...")
@@ -1299,6 +1307,9 @@ def decr_balance(stack=None, memory=None, pc=None, analysed=None):
     return stack, memory, pc, cache_state, cache_accounts
 
 
+def get_dicts():
+    return cache_deleted, cache_ui_txs, cache_dashboard_data, cache_verification_data
+
 # incase of new entry, always called after calc state due to dict ordering
 def calculate_root_hash(stack=None, memory=None, pc=None, analysed=None):
     log.debug(f"{pc}: CALCROOTHASH")
@@ -1635,7 +1646,6 @@ def update_verification_data(stack=None, memory=None, pc=None, analysed=None):
             valid_hashes.append(hash)
 
     cache_verification_data['hashes'] = valid_hashes
-    print(cache_verification_data)
         
     log.info(f"Verification data updated")
 
@@ -1949,142 +1959,3 @@ inst_mapping = {
     str(Opcodes.UPROOTHASH.value): update_root_hash,
     str(Opcodes.CALCMAINSTATE.value): calculate_main_state
 }
-
-
-'''
-Only sell events introduce money to the vm
-{create entry}
-sell y trays to buyer x of section k at price of s on p, by f
-PUSH y
-PUSH s
-MUL
-PUSH 1
-DUP
-PUSH k
-CADDR
-PUSH f
-CADDR
-PUSH k // section
-PUSH p // date
-PUSH x // buyer
-PUSH s // tray_price
-PUSH y // tray_no
-PUSH 5
-DUP
-PUSH 5
-sha256 // tx_hash
-PUSH f // by
-NOW    // submitted_on
-PUSH EVENT
-CENTRY
-
-buy y objects called x of section k at price of s on p, by f
-PUSH y
-PUSH s
-MUL
-PUSH 1
-DUP
-PUSH k
-CADDR
-PUSH f
-CADDR
-PUSH k // section
-PUSH p // date
-PUSH x // item name
-PUSH s // item_price
-PUSH y // item_no
-PUSH 5
-DUP
-PUSH 5
-sha256 // tx_hash
-PUSH f // by
-NOW    // submitted_on
-PUSH EVENT
-CENTRY
-
-trade from y to x k amount on p, by f
-PUSH date
-PUSH purchase_hash
-PUSH sales_hash
-PUSH x
-PUSH y
-PUSH amount
-PUSH 6
-DUP
-PUSH 6
-sha256 // tx_hash
-PUSH f // by
-NOW    // submitted_on
-PUSH y
-BALANCE
-PUSH k
-SUB
-PUSH 0
-LT
-PUSH EVENT
-SWAP
-CENTRY // checks if balance is ok
-
-
-eggs y objects called x of section k at price of s on p, by f
-PUSH y
-PUSH s
-MUL
-PUSH 1
-DUP
-PUSH k
-CADDR
-PUSH f
-CADDR
-PUSH k // section
-PUSH p // date
-PUSH x // buyer
-PUSH s // tray_price
-PUSH y // tray_no
-PUSH 5
-DUP
-PUSH 5
-sha256 // tx_hash
-PUSH f // by
-NOW    // submitted_on
-PUSH EVENT
-CENTRY
-
-
-y chickens are x(section) from k(location) on p cause of r image being i u, by f
-PUSH k // location
-PUSH x // section
-PUSH p // date
-PUSH y // number
-PUSH 4
-DUP
-PUSH 4
-sha256 // tx_hash
-PUSH r // reason
-PUSH i // image_id
-PUSH u // image_url
-PUSH f // by
-NOW    // submitted_on
-PUSH EVENT
-CENTRY
-
-
-
-
-
-{after all create/delete operations execute this instructions}
-PREPFINALISE
-sha256
-TXHASH
-EQ
-EXITLOOP
-JUMPIF
-sha256
-SWAP
-ROOTHASH
-EQ
-EXITLOOP
-JUMPIF
-STOP
-
-'''
