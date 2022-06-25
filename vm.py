@@ -27,6 +27,7 @@ class VM:
         self.cache_accounts = {}
         self.cache_deleted = {}
         self.cache_ui_txs = {}
+        self.edited_cols = set()
         self.cache_verification_data = {}
         self.cache_dashboard_data = {}
         self.analysed_code = {}
@@ -410,7 +411,7 @@ class VM:
                 total_spent_exists = ['total_spent' in v for k in self.cache_state for _k, v in self.cache_state[k].items() if EVENTC[BUY] == k and 'state' == _k]
                 total_birds_exists = ['total_birds' in v for k in self.cache_state for _k, v in self.cache_state[k].items() if 'world_state' == k and 'main' == _k]
                 is_len_valid = len(total_earned_exists) == len(total_spent_exists) == len(total_birds_exists) == 1
-                return is_len_valid and total_earned_exists[0] and total_spent_exists[0] and total_birds_exists[0]
+                return is_len_valid and total_earned_exists[0] and total_spent_exists[0] and total_birds_exists[0] and 'total_dead' in self.cache_state['dead_sick']['state'] and 'BANK' in self.cache_state['trades']['state']['balances']
             case Opcodes.JUMPIF.value:
                 return self.stack.size() > 0 and isinstance(self.stack.peek(), Decimal)
             case Opcodes.JUMPDEST.value:
@@ -484,6 +485,13 @@ class VM:
         log.info("dicts sanitized")
 
         for col_name in self.cache_state:
+            if 'state' in self.cache_state[col_name]:
+                if not self.cache_state[col_name]['state']['root_hash'] or col_name not in self.edited_cols:
+                    continue
+            else:
+                if not self.cache_state[col_name]['main']['root']:
+                    continue
+
             col_ref = db.collection(col_name)
             i = 0
             log.info(f"committing {col_name} docs...")
@@ -516,6 +524,7 @@ class VM:
         log.info("accounts committed")
 
         i = 0
+        log.info(f"committing UI txs docs...")
         for id in self.cache_ui_txs:
             doc_ref = tx_ui_col_ref.document(id)
             batch.set(doc_ref, self.cache_ui_txs[id])
@@ -566,7 +575,7 @@ class VM:
                 # reset log with unneccessary data
                 self.clear_log()
 
-                self.cache_deleted, self.cache_ui_txs, self.cache_dashboard_data, self.cache_verification_data = get_dicts()
+                self.cache_deleted, self.cache_ui_txs, self.cache_dashboard_data, self.cache_verification_data, self.edited_cols = get_dicts()
                 self.write_to_collection()
 
                 if self.stack.size():
