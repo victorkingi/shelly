@@ -27,7 +27,6 @@ class VM:
         self.cache_accounts = {}
         self.cache_deleted = {}
         self.cache_ui_txs = {}
-        self.edited_cols = set()
         self.cache_verification_data = {}
         self.cache_dashboard_data = {}
         self.analysed_code = {}
@@ -486,7 +485,7 @@ class VM:
 
         for col_name in self.cache_state:
             if 'state' in self.cache_state[col_name]:
-                if not self.cache_state[col_name]['state']['root_hash'] or col_name not in self.edited_cols:
+                if not self.cache_state[col_name]['state']['root_hash']:
                     continue
             else:
                 if not self.cache_state[col_name]['main']['root']:
@@ -503,7 +502,6 @@ class VM:
                 log.info(f"committed entry {i} of {len(self.cache_state[col_name].keys())}")
 
         log.info(f"all collections committed, committing extra data")
-        batch = db.batch()
         
         del_col_ref = db.collection('deleted')
         acc_col_ref = db.collection('accounts')
@@ -575,7 +573,7 @@ class VM:
                 # reset log with unneccessary data
                 self.clear_log()
 
-                self.cache_deleted, self.cache_ui_txs, self.cache_dashboard_data, self.cache_verification_data, self.edited_cols = get_dicts()
+                self.cache_deleted, self.cache_ui_txs, self.cache_dashboard_data, self.cache_verification_data = get_dicts()
                 self.write_to_collection()
 
                 if self.stack.size():

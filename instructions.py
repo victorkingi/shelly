@@ -76,7 +76,6 @@ cache_deleted = {} # no need to keep track of this as entries are only dumped in
 cache_ui_txs = {}
 cache_verification_data = {}
 cache_dashboard_data = {}
-edited_cols = set()
 
 
 def push(elem=None, stack=None, memory=None, pc=None, analysed=None):
@@ -600,8 +599,6 @@ def create_entry(stack=None, memory=None, pc=None, analysed=None):
         cache_state[EVENTC[SELL]]['state']['all_tx_hashes'][tx_hash] = cache_state[EVENTC[SELL]][tx_hash]['submitted_on']
         del cache_state[EVENTC[SELL]]['temp']
 
-        edited_cols.add('sales')
-
     elif entry_name == BUY:
         cache_state[EVENTC[BUY]]['temp'] = {}
         order = [ 'submitted_on', 'by', 'tx_hash', 'item_no', 'item_price', 'item_name', 'date', 'section' ]
@@ -645,8 +642,6 @@ def create_entry(stack=None, memory=None, pc=None, analysed=None):
         cache_state[EVENTC[BUY]]['state']['all_tx_hashes'][tx_hash] = cache_state[EVENTC[BUY]][tx_hash]['submitted_on']
         del cache_state[EVENTC[BUY]]['temp']
 
-        edited_cols.add('purchases')
-
     elif entry_name == DS:
         cache_state[EVENTC[DS]]['temp'] = {}
         order = [ 'submitted_on', 'by', 'image_url', 'image_id', 'reason', 'tx_hash', 'number', 'date', 'section', 'location']
@@ -689,8 +684,6 @@ def create_entry(stack=None, memory=None, pc=None, analysed=None):
         
         cache_state[EVENTC[DS]]['state']['all_tx_hashes'][tx_hash] = cache_state[EVENTC[DS]][tx_hash]['submitted_on']
         del cache_state[EVENTC[DS]]['temp']
-
-        edited_cols.add('dead_sick')
         
     elif entry_name == EGGS:
         cache_state[EVENTC[EGGS]]['temp'] = {}
@@ -733,8 +726,6 @@ def create_entry(stack=None, memory=None, pc=None, analysed=None):
 
         cache_state[EVENTC[EGGS]]['state']['all_tx_hashes'][tx_hash] = cache_state[EVENTC[EGGS]][tx_hash]['submitted_on']
         del cache_state[EVENTC[EGGS]]['temp']
-
-        edited_cols.add('eggs_collected')
 
     elif entry_name == TRADE:
         cache_state[EVENTC[TRADE]]['temp'] = {}
@@ -779,8 +770,6 @@ def create_entry(stack=None, memory=None, pc=None, analysed=None):
         cache_state[EVENTC[TRADE]]['state']['all_tx_hashes'][tx_hash] = cache_state[EVENTC[TRADE]][tx_hash]['submitted_on']
         del cache_state[EVENTC[TRADE]]['temp']
 
-        edited_cols.add('trades')
-
     if not is_replaced:
         log.info(f'Entry added, collection: {EVENTC[entry_name]}, {cache_state[EVENTC[entry_name]][entry_hash]}')
         memory['TOTALCREATES'] += 1
@@ -823,7 +812,6 @@ def delete_entry(stack=None, memory=None, pc=None, analysed=None):
         by: memory.get('user', 'null')
     }
     del cache_state[collection_name][tx_hash]
-    edited_cols(collection_name)
     
     log.info(f"entry deleted in collection {collection_name}, id: {tx_hash}")
     memory['TOTALDELETES'] += 1
@@ -1321,7 +1309,7 @@ def decr_balance(stack=None, memory=None, pc=None, analysed=None):
 
 
 def get_dicts():
-    return cache_deleted, cache_ui_txs, cache_dashboard_data, cache_verification_data, edited_cols
+    return cache_deleted, cache_ui_txs, cache_dashboard_data, cache_verification_data
 
 # incase of new entry, always called after calc state due to dict ordering
 def calculate_root_hash(stack=None, memory=None, pc=None, analysed=None):
