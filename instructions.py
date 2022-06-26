@@ -1311,47 +1311,87 @@ def decr_balance(stack=None, memory=None, pc=None, analysed=None):
 def get_dicts():
     return cache_deleted, cache_ui_txs, cache_dashboard_data, cache_verification_data
 
-# incase of new entry, always called after calc state due to dict ordering
+
 def calculate_root_hash(stack=None, memory=None, pc=None, analysed=None):
     log.debug(f"{pc}: CALCROOTHASH")
     pc += 1
 
     collection_name = stack.pop()
+    sorted_tuples = sorted(cache_state[collection_name].items(), key=lambda item: item[1]['date']['unix'] if 'date' in item[1] and 'unix' in item[1]['date'] else Decimal(0))
+    cache_state[collection_name] = {k: v for k, v in sorted_tuples}
     
-    full_list_data = []
+    true_hashes = []
     
     for id in cache_state[collection_name]:
+        tx_data_to_hash = ''
         if id == 'state' or id == 'prev_states':
             continue
         
         tx = cache_state[collection_name][id]
-
-        for k, v in tx.items():
-            if k == 'prev_values':
-                for i_k, i_v in v.items():
-                    if isinstance(i_v, dict):
-                        for ii_k, ii_v in i_v.items():
-                            if isinstance(ii_v, str) or isinstance(ii_v, Decimal):
-                                full_list_data.append(ii_v)
-                            elif isinstance(ii_v, dict):
-                                full_list_data.append(ii_v['unix'])
-                            else:
-                                log.warning(f"Encountered invalid type during hash aggregation, {type(ii_v)}")
-                                return None, None, None, None, None
-                    else:
-                        log.warning(f"Encountered invalid type during hash aggregation, {type(i_v)}")
-                        return None, None, None, None, None
-            else:
-                if isinstance(v, str) or isinstance(v, Decimal):
-                    full_list_data.append(v)
-                elif isinstance(v, dict):
-                    full_list_data.append(v['unix'])
-                else:
-                    log.warning(f"Encountered invalid type during hash aggregation, {type(v)}")
-                    return None, None, None, None, None
+        if collection_name == 'sales':
+            tx_data_to_hash += tx['section'] + str(tx['submitted_on']['unix']) + tx['buyer'] + str(tx['tray_price']) + tx['tx_hash'] + str(tx['tray_no']) + tx['by'] + str(tx['date']['unix'])
             
-    stack.push(full_list_data)
-    stack.push(Decimal(len(full_list_data)))
+            if tx['prev_values']:
+                log.debug(f"found prev values dict of size {len(tx['prev_values'].keys())}")
+                for k in tx['prev_values']:
+                    prev = tx['prev_values'][k]
+                    tx_data_to_hash += prev['section'] + str(prev['submitted_on']['unix']) + prev['buyer'] + str(prev['tray_price']) + prev['tx_hash'] + str(prev['tray_no']) + prev['by'] + str(prev['date']['unix'])
+
+        elif collection_name == 'purchases':
+            tx_data_to_hash += tx['section'] + str(tx['submitted_on']['unix']) + tx['item_name'] + str(tx['item_price']) + tx['tx_hash'] + str(tx['item_no']) + tx['by'] + str(tx['date']['unix'])
+            
+            if tx['prev_values']:
+                log.debug(f"found prev values dict of size {len(tx['prev_values'].keys())}")
+                for k in tx['prev_values']:
+                    prev = tx['prev_values'][k]
+                    tx_data_to_hash += tx['section'] + str(tx['submitted_on']['unix']) + tx['item_name'] + str(tx['item_price']) + tx['tx_hash'] + str(tx['item_no']) + tx['by'] + str(tx['date']['unix'])
+           
+        elif collection_name == 'trades':
+            tx_data_to_hash += str(tx['amount']) + tx['sale_hash'] + tx['purchase_hash'] + str(tx['submitted_on']['unix']) + tx['from'] + tx['to'] + str(tx['reason']) + tx['tx_hash'] + tx['by'] + str(tx['date']['unix'])
+            
+            if tx['prev_values']:
+                log.debug(f"found prev values dict of size {len(tx['prev_values'].keys())}")
+                for k in tx['prev_values']:
+                    prev = tx['prev_values'][k]
+                    tx_data_to_hash += str(tx['amount']) + tx['sale_hash'] + tx['purchase_hash'] + str(tx['submitted_on']['unix']) + tx['from'] + tx['to'] + str(tx['reason']) + tx['tx_hash'] + tx['by'] + str(tx['date']['unix'])
+           
+        elif collection_name == 'eggs_collected':
+            tx_data_to_hash += str(tx['a1']) + str(tx['a2']) + str(tx['b1']) + str(tx['b2']) + str(tx['c1']) + str(tx['c2']) + str(tx['submitted_on']['unix']) + str(tx['broken']) + str(tx['house']) + tx['tx_hash'] + tx['trays_collected'] + tx['by'] + str(tx['date']['unix'])
+            
+            if tx['prev_values']:
+                log.debug(f"found prev values dict of size {len(tx['prev_values'].keys())}")
+                for k in tx['prev_values']:
+                    prev = tx['prev_values'][k]
+                    tx_data_to_hash += str(tx['a1']) + str(tx['a2']) + str(tx['b1']) + str(tx['b2']) + str(tx['c1']) + str(tx['c2']) + str(tx['submitted_on']['unix']) + str(tx['broken']) + str(tx['house']) + tx['tx_hash'] + tx['trays_collected'] + tx['by'] + str(tx['date']['unix'])
+           
+        elif collection_name == 'dead_sick':
+            tx_data_to_hash += tx['image_id'] + tx['image_url'] + tx['section'] + str(tx['submitted_on']['unix']) + tx['location'] + str(tx['number']) + tx['tx_hash'] + tx['reason'] + tx['by'] + str(tx['date']['unix'])
+            
+            if tx['prev_values']:
+                log.debug(f"found prev values dict of size {len(tx['prev_values'].keys())}")
+                for k in tx['prev_values']:
+                    prev = tx['prev_values'][k]
+                    tx_data_to_hash += tx['image_id'] + tx['image_url'] + tx['section'] + str(tx['submitted_on']['unix']) + tx['location'] + str(tx['number']) + tx['tx_hash'] + tx['reason'] + tx['by'] + str(tx['date']['unix'])
+            
+        log.debug(f"{collection_name} id: {id} tx data to hash, {tx_data_to_hash}")
+        true_hashes.append(tx_data_to_hash)
+
+    def internal_hash(to_hash):
+        m = hashlib.sha256()
+        m.update(to_hash.encode())
+        return m.hexdigest()
+
+    true_hashes = map(internal_hash, true_hashes)
+    i = 0
+    for id in cache_state[collection_name]:
+        if id == 'state' or id == 'prev_states':
+            continue
+        cache_state[collection_name]['state']['all_tx_hashes'][id]['true_hash'] = true_hashes[i]
+        i += 1
+        
+            
+    stack.push(true_hashes)
+    stack.push(Decimal(len(true_hashes)))
         
     return stack, memory, pc, cache_state, cache_accounts
 
@@ -1504,7 +1544,7 @@ def calculate_main_state(stack=None, memory=None, pc=None, analysed=None):
     cache_state['world_state']['main']['total_birds'] = total_birds
     cache_state['world_state']['main']['trays_available'] = get_eggs_diff(all_trays_collected, all_trays_sold)[0]
 
-    to_hash_list = [v['root_hash'] for x in cache_state for y, v in cache_state[x].items() if x != 'world_state' and y == 'state']
+    to_hash_list = [cache_state['sales']['state']['root_hash'], cache_state['purchases']['state']['root_hash'], cache_state['eggs_collected']['state']['root_hash'], cache_state['dead_sick']['state']['root_hash'], cache_state['trades']['state']['root_hash']]
     stack.push(to_hash_list)
     stack.push(Decimal(len(to_hash_list)))
 
@@ -1737,6 +1777,22 @@ def update_dashboard_data(stack=None, memory=None, pc=None, analysed=None):
     return stack, memory, pc, cache_state, cache_accounts
 
 
+# check if a change happened remote
+def compare_with_remote(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: REMOTE")
+    pc += 1
+
+    col_ref = db.collection('world_state')
+    world_state_doc = col_ref.document('main').get()
+    world_state = world_state_doc.to_dict()
+    
+
+    for col_name in EVENTC.values():
+        col_ref = db.collection(col_name)
+
+
+    return stack, memory, pc, cache_state, cache_accounts
+
 # each week and month is represented by a timestamp
 # month is current_timestamp+28days, week is current_timestamp+7days
 def initialise():
@@ -1940,6 +1996,7 @@ inst_mapping = {
     str(Opcodes.ROOTHASH.value): root_hash,
     str(Opcodes.SHA256.value): sha256,
     str(Opcodes.UPDATECACHE.value): update_cache,
+    str(Opcodes.REMOTE.value): compare_with_remote,
     str(Opcodes.VERIFYCOL.value): update_verification_data,
     str(Opcodes.UIENTRIES.value): update_ui_entries,
     str(Opcodes.DASHBOARD.value): update_dashboard_data,

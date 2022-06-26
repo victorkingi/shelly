@@ -436,6 +436,8 @@ class VM:
                 if all (k in self.cache_state for k in EVENTC.values()) and 'trays_available' in self.cache_state['world_state']['main']:
                     return True
                 return False
+            case Opcodes.REMOTE.value:
+                return True
             case _:
                 log.warning(f"Invalid opcode provided, {instr}")
                 return False
