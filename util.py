@@ -10,6 +10,68 @@ import collections.abc
 eggs_in_tray = Decimal(30)
 
 
+def get_true_hash_for_tx(tx, collection_name):
+    tx_data_to_hash = ''
+
+    if collection_name == 'sales':
+        tx_data_to_hash += tx['section'] + str(tx['submitted_on']['unix']) + tx['buyer'] + str(tx['tray_price']) + tx['tx_hash'] + str(tx['tray_no']) + tx['by'] + str(tx['date']['unix'])
+        
+        if tx['prev_values']:
+            log.debug(f"found prev values dict of size {len(tx['prev_values'].keys())}")
+            for k in tx['prev_values']:
+                prev = tx['prev_values'][k]
+                tx_data_to_hash += prev['section'] + str(prev['submitted_on']['unix']) + prev['buyer'] + str(prev['tray_price']) + prev['tx_hash'] + str(prev['tray_no']) + prev['by'] + str(prev['date']['unix'])
+
+    elif collection_name == 'purchases':
+        tx_data_to_hash += tx['section'] + str(tx['submitted_on']['unix']) + tx['item_name'] + str(tx['item_price']) + tx['tx_hash'] + str(tx['item_no']) + tx['by'] + str(tx['date']['unix'])
+        
+        if tx['prev_values']:
+            log.debug(f"found prev values dict of size {len(tx['prev_values'].keys())}")
+            for k in tx['prev_values']:
+                prev = tx['prev_values'][k]
+                tx_data_to_hash += tx['section'] + str(tx['submitted_on']['unix']) + tx['item_name'] + str(tx['item_price']) + tx['tx_hash'] + str(tx['item_no']) + tx['by'] + str(tx['date']['unix'])
+        
+    elif collection_name == 'trades':
+        tx_data_to_hash += str(tx['amount']) + tx['sale_hash'] + tx['purchase_hash'] + str(tx['submitted_on']['unix']) + tx['from'] + tx['to'] + str(tx['reason']) + tx['tx_hash'] + tx['by'] + str(tx['date']['unix'])
+        
+        if tx['prev_values']:
+            log.debug(f"found prev values dict of size {len(tx['prev_values'].keys())}")
+            for k in tx['prev_values']:
+                prev = tx['prev_values'][k]
+                tx_data_to_hash += str(tx['amount']) + tx['sale_hash'] + tx['purchase_hash'] + str(tx['submitted_on']['unix']) + tx['from'] + tx['to'] + str(tx['reason']) + tx['tx_hash'] + tx['by'] + str(tx['date']['unix'])
+        
+    elif collection_name == 'eggs_collected':
+        tx_data_to_hash += str(tx['a1']) + str(tx['a2']) + str(tx['b1']) + str(tx['b2']) + str(tx['c1']) + str(tx['c2']) + str(tx['submitted_on']['unix']) + str(tx['broken']) + str(tx['house']) + tx['tx_hash'] + tx['trays_collected'] + tx['by'] + str(tx['date']['unix'])
+        
+        if tx['prev_values']:
+            log.debug(f"found prev values dict of size {len(tx['prev_values'].keys())}")
+            for k in tx['prev_values']:
+                prev = tx['prev_values'][k]
+                tx_data_to_hash += str(tx['a1']) + str(tx['a2']) + str(tx['b1']) + str(tx['b2']) + str(tx['c1']) + str(tx['c2']) + str(tx['submitted_on']['unix']) + str(tx['broken']) + str(tx['house']) + tx['tx_hash'] + tx['trays_collected'] + tx['by'] + str(tx['date']['unix'])
+        
+    elif collection_name == 'dead_sick':
+        tx_data_to_hash += tx['image_id'] + tx['image_url'] + tx['section'] + str(tx['submitted_on']['unix']) + tx['location'] + str(tx['number']) + tx['tx_hash'] + tx['reason'] + tx['by'] + str(tx['date']['unix'])
+        
+        if tx['prev_values']:
+            log.debug(f"found prev values dict of size {len(tx['prev_values'].keys())}")
+            for k in tx['prev_values']:
+                prev = tx['prev_values'][k]
+                tx_data_to_hash += tx['image_id'] + tx['image_url'] + tx['section'] + str(tx['submitted_on']['unix']) + tx['location'] + str(tx['number']) + tx['tx_hash'] + tx['reason'] + tx['by'] + str(tx['date']['unix'])
+
+    else:
+        log.error("Invalid collection name provided to true hash function")
+        return None
+    
+    log.debug(f"tx data to hash, {tx_data_to_hash}")
+
+    def internal_hash(to_hash):
+        m = hashlib.sha256()
+        m.update(to_hash.encode())
+        return m.hexdigest()
+    
+    return internal_hash(tx_data_to_hash)
+
+
 def get_eggs_diff(val1, val2):
     if isinstance(val1, str) and isinstance(val2, str):
         val1 = val1.split(',')

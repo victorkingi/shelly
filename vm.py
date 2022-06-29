@@ -5,6 +5,7 @@ import re
 import sys
 import os
 import time
+import uuid
 
 from opcodes import Opcodes
 from log_ import log
@@ -18,10 +19,11 @@ EARLIEST_VALID_YEAR = 1577836800 # unix epoch of earliest reasonable data date w
 
 class VM:
     def __init__(self, code_=[]):
+        self.instance_id = uuid.uuid4()
         self.code = code_
         self.log_file = 'vm.log'
         self.stack = Stack()
-        self.memory = { 'TOTALCREATES': 0, 'TOTALDELETES': 0, 'TOTALREPLACE': 0, 'REPLACED': {}, 'ADDED': {}, 'DELETES': {}}
+        self.memory = {'PROCID': self.instance_id, 'TOTALCREATES': 0, 'TOTALDELETES': 0, 'TOTALREPLACE': 0, 'REPLACED': {}, 'ADDED': {}, 'DELETES': {}}
         self.pc = 0             # program counter
         self.cache_state = {}
         self.cache_accounts = {}
@@ -472,82 +474,8 @@ class VM:
                 
                 log.info(f'Reduced file size from {round(size/(1024 * 1024), 2)} MB to {round(os.path.getsize(file_)/(1024 * 1024), 2)} MB')
 
-
-    def write_to_collection(self):
-        batch = db.batch()
-
-        #replace decimal type with float
-        map_nested_dicts_modify(self.cache_state, lambda v: float(v) if isinstance(v, Decimal) else v)
-        map_nested_dicts_modify(self.cache_deleted, lambda v: float(v) if isinstance(v, Decimal) else v)
-        map_nested_dicts_modify(self.cache_accounts, lambda v: float(v) if isinstance(v, Decimal) else v)
-        map_nested_dicts_modify(self.cache_ui_txs, lambda v: float(v) if isinstance(v, Decimal) else v)
-        map_nested_dicts_modify(self.cache_verification_data, lambda v: float(v) if isinstance(v, Decimal) else v)
-        map_nested_dicts_modify(self.cache_dashboard_data, lambda v: float(v) if isinstance(v, Decimal) else v)
-        log.info("dicts sanitized")
-
-        for col_name in self.cache_state:
-            if 'state' in self.cache_state[col_name]:
-                if not self.cache_state[col_name]['state']['root_hash']:
-                    continue
-            else:
-                if not self.cache_state[col_name]['main']['root']:
-                    continue
-
-            col_ref = db.collection(col_name)
-            i = 0
-            log.info(f"committing {col_name} docs...")
-            for id in self.cache_state[col_name]:
-                doc_ref = col_ref.document(id)
-                batch.set(doc_ref, self.cache_state[col_name][id])
-                batch.commit()
-                i += 1
-                log.info(f"committed entry {i} of {len(self.cache_state[col_name].keys())}")
-
-        log.info(f"all collections committed, committing extra data")
-        
-        del_col_ref = db.collection('deleted')
-        acc_col_ref = db.collection('accounts')
-        tx_ui_col_ref = db.collection('tx_ui')
-        ver_data_col_ref = db.collection('verification_data')
-        dash_col_ref = db.collection('dashboard_data')
-
-        for id in self.cache_deleted:
-            doc_ref = del_col_ref.document(id)
-            batch.set(doc_ref, self.cache_deleted[id])
-        
-        batch.commit()
-        log.info("deleted docs committed")
-        
-        doc_ref = acc_col_ref.document('accounts')
-        batch.set(doc_ref, self.cache_accounts)
-
-        log.info("accounts committed")
-
-        i = 0
-        log.info(f"committing UI txs docs...")
-        for id in self.cache_ui_txs:
-            doc_ref = tx_ui_col_ref.document(id)
-            batch.set(doc_ref, self.cache_ui_txs[id])
-            batch.commit()
-            i += 1
-            log.info(f"committed entry {i} of {len(self.cache_ui_txs.keys())}")
-
-        log.info("UI transactions committed")
-        
-        doc_ref = ver_data_col_ref.document('verification')
-        batch.set(doc_ref, self.cache_verification_data)
-
-        log.info("Verification data committed")
-        
-        for id in self.cache_dashboard_data:
-            doc_ref = dash_col_ref.document(id)
-            batch.set(doc_ref, self.cache_dashboard_data[id])
-
-        batch.commit()
-        log.info("Data written successfully")
-
-
     def execute(self):
+        log.info(f"Instance id: {str(self.instance_id)}")
         log.info(f"Code size: {len(self.code)}")
         log.info(f"Code input: {self.code}")
 
@@ -579,7 +507,6 @@ class VM:
                 self.clear_log()
 
                 self.cache_deleted, self.cache_ui_txs, self.cache_dashboard_data, self.cache_verification_data = get_dicts()
-                self.write_to_collection()
 
                 if self.stack.size():
                     # no update was made to firestore, hence just return computed output

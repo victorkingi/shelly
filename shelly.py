@@ -35,15 +35,19 @@ if __name__ == '__main__':
                 ds = [26, 'gfsd', 26, 'dfgs', 26, 1, 26, 253, 26, '5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9',26, 'dfgh',26, 'dfgh',26, 'https://google.com', 26, 'dfgh', 26, 0, 26, 'DS', 14]
                 end = [0, 'eggs_collected', 0, 1, 1, 0, 1, 1, 24, 25, 14, 26]+[0, 'trades', 0, 1, 1, 0, 1, 1, 24, 25, 14, 26, 0, 'purchases', 0, 1, 1, 0, 1, 1, 24, 25, 14, 26]+[0, 'sales', 0, 1, 1, 0, 1, 1, 24, 25, 14, 26, 27, 14, 0, 'main', 2, 26, 31]
                 
-                signal = 0
+                signal = -2
+                res, acc, state = None, None, None
 
                 while signal == -2:
-                    vm_ = VM([0, 'trades', 0, 'dead_sick', 0, 'sales', 0, 'purchases', 0, 'world_state', 0, 'eggs_collected', 20, 20, 20, 20, 20, 20]+[0, 'dead_sick', 0, 1, 1, 0, 1, 1, 24, 25, 14, 26]+end[:-1]+[37, 38, 39, 31])
+                    vm_ = VM(create_instr('eggs_collected')+create_instr('sales')+create_instr('purchases')+[0, 'trades', 0, 1, 1, 0, 1, 1, 24, 25, 14, 26]+create_instr('trade')+create_instr('ds')+[0, 'dead_sick', 0, 1, 1, 0, 1, 1, 24, 25, 14, 26]+end[:-1]+[37, 38, 39, 40, 31])
                     #cops = CommonOps()
                     #vm_ = VM(flattened_code)
                     # 1647291600 1640034000
                     vm_.analyse()
                     res, state, acc, signal = vm_.execute()
+                    if signal == -2:
+                        print("re-run signal received!")
+                    
                 print("vm result:", res)
                 if state is not None and acc is not None:
                     map_nested_dicts_modify(state, lambda v: float(v) if isinstance(v, Decimal) else v)

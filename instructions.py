@@ -5,6 +5,7 @@ from firebase_admin import credentials
 from firebase_admin import firestore
 from datetime import datetime as dt
 from dateutil import tz
+from progress.bar import FillingCirclesBar
 import time
 import sys
 import re
@@ -76,6 +77,7 @@ cache_deleted = {} # no need to keep track of this as entries are only dumped in
 cache_ui_txs = {}
 cache_verification_data = {}
 cache_dashboard_data = {}
+temp_all_hashes = {}
 
 
 def push(elem=None, stack=None, memory=None, pc=None, analysed=None):
@@ -433,6 +435,8 @@ def update_cache(stack=None, memory=None, pc=None, analysed=None):
         cache_state['world_state']['main'] = state_dict
         state_dict = collection_ref.document('prev_states').get().to_dict()
         cache_state['world_state']['prev_states'] = state_dict
+        global temp_all_hashes
+        temp_all_hashes = dict(cache_state['world_state']['main']['all_hashes'])
         map_nested_dicts_modify(cache_state, lambda v: Decimal(f'{v}') if isinstance(v, float) or isinstance(v, int) else v)
         log.debug("Updated main state")
         return stack, memory, pc, cache_state, cache_accounts
@@ -597,6 +601,8 @@ def create_entry(stack=None, memory=None, pc=None, analysed=None):
             cache_state[EVENTC[SELL]][tx_hash] = cache_state[EVENTC[SELL]]['temp']
         
         cache_state[EVENTC[SELL]]['state']['all_tx_hashes'][tx_hash] = cache_state[EVENTC[SELL]][tx_hash]['submitted_on']
+        cache_state[EVENTC[SELL]]['state']['all_tx_hashes'][tx_hash]['true_hash'] = get_true_hash_for_tx(cache_state[EVENTC[SELL]][tx_hash], EVENTC[SELL])
+        cache_state['world_state']['main']['all_hashes'][EVENTC[SELL]][tx_hash] = get_true_hash_for_tx(cache_state[EVENTC[SELL]][tx_hash], EVENTC[SELL])
         del cache_state[EVENTC[SELL]]['temp']
 
     elif entry_name == BUY:
@@ -640,6 +646,8 @@ def create_entry(stack=None, memory=None, pc=None, analysed=None):
             cache_state[EVENTC[BUY]][tx_hash] = cache_state[EVENTC[BUY]]['temp']
 
         cache_state[EVENTC[BUY]]['state']['all_tx_hashes'][tx_hash] = cache_state[EVENTC[BUY]][tx_hash]['submitted_on']
+        cache_state[EVENTC[BUY]]['state']['all_tx_hashes'][tx_hash]['true_hash'] = get_true_hash_for_tx(cache_state[EVENTC[BUY]][tx_hash], EVENTC[BUY])
+        cache_state['world_state']['main']['all_hashes'][EVENTC[BUY]][tx_hash] = get_true_hash_for_tx(cache_state[EVENTC[BUY]][tx_hash], EVENTC[BUY])
         del cache_state[EVENTC[BUY]]['temp']
 
     elif entry_name == DS:
@@ -683,6 +691,8 @@ def create_entry(stack=None, memory=None, pc=None, analysed=None):
             cache_state[EVENTC[DS]][tx_hash] = cache_state[EVENTC[DS]]['temp']
         
         cache_state[EVENTC[DS]]['state']['all_tx_hashes'][tx_hash] = cache_state[EVENTC[DS]][tx_hash]['submitted_on']
+        cache_state[EVENTC[DS]]['state']['all_tx_hashes'][tx_hash]['true_hash'] = get_true_hash_for_tx(cache_state[EVENTC[DS]][tx_hash], EVENTC[DS])
+        cache_state['world_state']['main']['all_hashes'][EVENTC[DS]][tx_hash] = get_true_hash_for_tx(cache_state[EVENTC[DS]][tx_hash], EVENTC[DS])
         del cache_state[EVENTC[DS]]['temp']
         
     elif entry_name == EGGS:
@@ -725,6 +735,8 @@ def create_entry(stack=None, memory=None, pc=None, analysed=None):
             cache_state[EVENTC[EGGS]][tx_hash] = cache_state[EVENTC[EGGS]]['temp']
 
         cache_state[EVENTC[EGGS]]['state']['all_tx_hashes'][tx_hash] = cache_state[EVENTC[EGGS]][tx_hash]['submitted_on']
+        cache_state[EVENTC[EGGS]]['state']['all_tx_hashes'][tx_hash]['true_hash'] = get_true_hash_for_tx(cache_state[EVENTC[EGGS]][tx_hash], EVENTC[EGGS])
+        cache_state['world_state']['main']['all_hashes'][EVENTC[EGGS]][tx_hash] = get_true_hash_for_tx(cache_state[EVENTC[EGGS]][tx_hash], EVENTC[EGGS])
         del cache_state[EVENTC[EGGS]]['temp']
 
     elif entry_name == TRADE:
@@ -768,6 +780,8 @@ def create_entry(stack=None, memory=None, pc=None, analysed=None):
             cache_state[EVENTC[TRADE]][tx_hash] = cache_state[EVENTC[TRADE]]['temp']
 
         cache_state[EVENTC[TRADE]]['state']['all_tx_hashes'][tx_hash] = cache_state[EVENTC[TRADE]][tx_hash]['submitted_on']
+        cache_state[EVENTC[TRADE]]['state']['all_tx_hashes'][tx_hash]['true_hash'] = get_true_hash_for_tx(cache_state[EVENTC[TRADE]][tx_hash], EVENTC[TRADE])
+        cache_state['world_state']['main']['all_hashes'][EVENTC[TRADE]][tx_hash] = get_true_hash_for_tx(cache_state[EVENTC[TRADE]][tx_hash], EVENTC[TRADE])
         del cache_state[EVENTC[TRADE]]['temp']
 
     if not is_replaced:
@@ -1323,73 +1337,22 @@ def calculate_root_hash(stack=None, memory=None, pc=None, analysed=None):
     true_hashes = []
     
     for id in cache_state[collection_name]:
-        tx_data_to_hash = ''
         if id == 'state' or id == 'prev_states':
             continue
         
         tx = cache_state[collection_name][id]
-        if collection_name == 'sales':
-            tx_data_to_hash += tx['section'] + str(tx['submitted_on']['unix']) + tx['buyer'] + str(tx['tray_price']) + tx['tx_hash'] + str(tx['tray_no']) + tx['by'] + str(tx['date']['unix'])
-            
-            if tx['prev_values']:
-                log.debug(f"found prev values dict of size {len(tx['prev_values'].keys())}")
-                for k in tx['prev_values']:
-                    prev = tx['prev_values'][k]
-                    tx_data_to_hash += prev['section'] + str(prev['submitted_on']['unix']) + prev['buyer'] + str(prev['tray_price']) + prev['tx_hash'] + str(prev['tray_no']) + prev['by'] + str(prev['date']['unix'])
 
-        elif collection_name == 'purchases':
-            tx_data_to_hash += tx['section'] + str(tx['submitted_on']['unix']) + tx['item_name'] + str(tx['item_price']) + tx['tx_hash'] + str(tx['item_no']) + tx['by'] + str(tx['date']['unix'])
-            
-            if tx['prev_values']:
-                log.debug(f"found prev values dict of size {len(tx['prev_values'].keys())}")
-                for k in tx['prev_values']:
-                    prev = tx['prev_values'][k]
-                    tx_data_to_hash += tx['section'] + str(tx['submitted_on']['unix']) + tx['item_name'] + str(tx['item_price']) + tx['tx_hash'] + str(tx['item_no']) + tx['by'] + str(tx['date']['unix'])
-           
-        elif collection_name == 'trades':
-            tx_data_to_hash += str(tx['amount']) + tx['sale_hash'] + tx['purchase_hash'] + str(tx['submitted_on']['unix']) + tx['from'] + tx['to'] + str(tx['reason']) + tx['tx_hash'] + tx['by'] + str(tx['date']['unix'])
-            
-            if tx['prev_values']:
-                log.debug(f"found prev values dict of size {len(tx['prev_values'].keys())}")
-                for k in tx['prev_values']:
-                    prev = tx['prev_values'][k]
-                    tx_data_to_hash += str(tx['amount']) + tx['sale_hash'] + tx['purchase_hash'] + str(tx['submitted_on']['unix']) + tx['from'] + tx['to'] + str(tx['reason']) + tx['tx_hash'] + tx['by'] + str(tx['date']['unix'])
-           
-        elif collection_name == 'eggs_collected':
-            tx_data_to_hash += str(tx['a1']) + str(tx['a2']) + str(tx['b1']) + str(tx['b2']) + str(tx['c1']) + str(tx['c2']) + str(tx['submitted_on']['unix']) + str(tx['broken']) + str(tx['house']) + tx['tx_hash'] + tx['trays_collected'] + tx['by'] + str(tx['date']['unix'])
-            
-            if tx['prev_values']:
-                log.debug(f"found prev values dict of size {len(tx['prev_values'].keys())}")
-                for k in tx['prev_values']:
-                    prev = tx['prev_values'][k]
-                    tx_data_to_hash += str(tx['a1']) + str(tx['a2']) + str(tx['b1']) + str(tx['b2']) + str(tx['c1']) + str(tx['c2']) + str(tx['submitted_on']['unix']) + str(tx['broken']) + str(tx['house']) + tx['tx_hash'] + tx['trays_collected'] + tx['by'] + str(tx['date']['unix'])
-           
-        elif collection_name == 'dead_sick':
-            tx_data_to_hash += tx['image_id'] + tx['image_url'] + tx['section'] + str(tx['submitted_on']['unix']) + tx['location'] + str(tx['number']) + tx['tx_hash'] + tx['reason'] + tx['by'] + str(tx['date']['unix'])
-            
-            if tx['prev_values']:
-                log.debug(f"found prev values dict of size {len(tx['prev_values'].keys())}")
-                for k in tx['prev_values']:
-                    prev = tx['prev_values'][k]
-                    tx_data_to_hash += tx['image_id'] + tx['image_url'] + tx['section'] + str(tx['submitted_on']['unix']) + tx['location'] + str(tx['number']) + tx['tx_hash'] + tx['reason'] + tx['by'] + str(tx['date']['unix'])
-            
-        log.debug(f"{collection_name} id: {id} tx data to hash, {tx_data_to_hash}")
-        true_hashes.append(tx_data_to_hash)
+        log.debug(f"{collection_name} id: {id}")
+        true_hashes.append(get_true_hash_for_tx(tx, collection_name))
 
-    def internal_hash(to_hash):
-        m = hashlib.sha256()
-        m.update(to_hash.encode())
-        return m.hexdigest()
-
-    true_hashes = map(internal_hash, true_hashes)
     i = 0
     for id in cache_state[collection_name]:
         if id == 'state' or id == 'prev_states':
             continue
         cache_state[collection_name]['state']['all_tx_hashes'][id]['true_hash'] = true_hashes[i]
+        cache_state['world_state']['main']['all_hashes'][collection_name][id] = true_hashes[i]
         i += 1
-        
-            
+             
     stack.push(true_hashes)
     stack.push(Decimal(len(true_hashes)))
         
@@ -1404,10 +1367,11 @@ def update_root_hash(stack=None, memory=None, pc=None, analysed=None):
     collection_name = stack.pop()
     if collection_name != 'main':
         cache_state[collection_name]['state']['root_hash'] = hash
+        cache_state['world_state']['main']['col_roots'].append(hash)
         log.debug(f"New state: {cache_state[collection_name]['state']}")
         return stack, memory, pc, cache_state, cache_accounts
     else:
-        cache_state['world_state']['main']['root'] = hash   
+        cache_state['world_state']['main']['root'] = hash
         log.debug(f"New main state: {cache_state['world_state']['main']}")
         return stack, memory, pc, cache_state, cache_accounts
 
@@ -1787,144 +1751,168 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
     log.debug(f"{pc}: WRITE")
     pc += 1
 
-    ws_col_ref = db.collection('world_state')
-    world_state_ref = col_ref.document('main')
+    map_nested_dicts_modify(cache_state, lambda v: float(v) if isinstance(v, Decimal) else v)
+    map_nested_dicts_modify(cache_deleted, lambda v: float(v) if isinstance(v, Decimal) else v)
+    map_nested_dicts_modify(cache_accounts, lambda v: float(v) if isinstance(v, Decimal) else v)
+    map_nested_dicts_modify(cache_ui_txs, lambda v: float(v) if isinstance(v, Decimal) else v)
+    map_nested_dicts_modify(cache_verification_data, lambda v: float(v) if isinstance(v, Decimal) else v)
+    map_nested_dicts_modify(cache_dashboard_data, lambda v: float(v) if isinstance(v, Decimal) else v)
+    log.info("dicts sanitized")
 
-    deleted_col_ref = db.collection('deleted')
+    ws_col_ref = db.collection('world_state')
+    world_state_ref = ws_col_ref.document('main')
+
+    mutex_lock_col_ref = db.collection('mutex_lock')
+    mutex_lock_ref = mutex_lock_col_ref.document('lock')
+
+    del_col_ref = db.collection('deleted')
+    acc_col_ref = db.collection('accounts')
+    tx_ui_col_ref = db.collection('tx_ui')
+    ver_data_col_ref = db.collection('verification_data')
+    dash_col_ref = db.collection('dashboard_data')
 
     transaction = db.transaction()
 
     @firestore.transactional
-    def update_in_transaction(transaction, world_state_ref):
-        deleted_ref_docs = deleted_col_ref.stream(transaction=transaction)
-        snapshot = world_state_ref.get(transaction=transaction)
+    def get_lock(transaction, mutex_lock_ref):
+        mutex_snap = mutex_lock_ref.get(transaction=transaction)
+        is_lock_held = mutex_snap.get('is_lock_held')
+        proc_id = mutex_snap.get('process_name')
 
-        deleted_docs = {}
-        for doc in deleted_ref_docs:
-            deleted_docs[doc.id] = doc.to_dict()
+        if is_lock_held == 1 and str(memory['PROCID']) != proc_id:
+            log.warning(f"Lock is held by process {proc_id}, hence, write will not happen")
+            return 0
+        elif is_lock_held == 1 and str(memory['PROCID']) == proc_id:
+            log.info("Lock still held, proceeding...")
+            return 1
+        elif is_lock_held == 0:
+            transaction.update(mutex_lock_ref, {'is_lock_held': 1, 'process_name': str(memory['PROCID'])})
+            log.info("Acquired lock! proceeding...")
+            return 1
+        else:
+            log.error("Lock document not found")
+            return 0
+    
+    is_lock_acquired = get_lock(transaction, mutex_lock_ref)
 
-        remote_ws_dict = snapshot.to_dict()
-        remote_root = remote_ws_dict['root']
-        remote_col_roots = remote_ws_dict['col_roots']
-        local_col_roots = set()
+    if not is_lock_acquired:
+        return None, None, None, None, None
+  
+    snapshot = world_state_ref.get()
 
-        for k in cache_state:
-            if 'state' in cache_state[k]:
-                local_col_roots.add(cache_state[k]['state']['root_hash'])
+    remote_ws_dict = snapshot.to_dict()
+    remote_root = remote_ws_dict['root']
+    remote_col_roots = set(remote_ws_dict['col_roots'])
+    local_col_roots = set()
+
+    for k in cache_state:
+        if 'state' in cache_state[k]:
+            local_col_roots.add(cache_state[k]['state']['root_hash'])
+    
+    if remote_root == cache_state['world_state']['main']['root']:
+        log.info("Remote and local main root hash match, no changes were made")
+        return stack, memory, pc, cache_state, cache_accounts
+    
+    if remote_col_roots == local_col_roots:
+        log.error(f"Remote and local collection root hashes match when main root don't, {local_col_roots}")
+        return None, None, None, None, None
+
+    altered_collections = local_col_roots - remote_col_roots
+    col_names = []
+    for v in altered_collections:
+        # a set of local collections that were edited
+        temp_col_names = [x for x in cache_state if x != 'world_state' and cache_state[x]['state']['root_hash'] == v]
+        print(temp_col_names)
+        col_names.append(temp_col_names[0])
+
+    batch = db.batch()
+
+    for x in col_names:
+        local_tx_hashes = set(cache_state['world_state']['main']['all_hashes'][x].keys())
+        remote_tx_hashes = set(remote_ws_dict['all_hashes'][x].keys())
+
+        is_in_remote = remote_tx_hashes - local_tx_hashes
+        for k in is_in_remote:
+            if k not in cache_deleted:
+                # new cloud entry
+                log.info("Change happened in remote, cloud create, rerun signal sent...")
+                return stack, memory, -2, cache_state, cache_accounts
         
-
-        if remote_root == cache_state['world_state']['main']['root']:
-            log.info("Remote and local main root hash match, no changes were made")
-            return stack, memory, pc, cache_state, cache_accounts
+        is_in_local = local_tx_hashes - remote_tx_hashes
+        for k in is_in_local:
+            if k in remote_ws_dict['all_hashes']['deleted'].keys():
+                # new cloud delete 
+                log.info("Change happened in remote, cloud delete, rerun signal sent...")
+                return stack, memory, -2, cache_state, cache_accounts
         
-        if set(remote_col_roots) == local_col_roots:
-            log.error(f"Remote and local collection root hashes match when main root don't, {local_col_roots}")
-            return None, None, None, None, None
-        
+        # if no new delete or create happened in cloud, then maybe prev values was updated
+        local_true_hashes = set(temp_all_hashes[x].values())
+        remote_true_hashes = set(remote_ws_dict['all_hashes'][x].values())
+        prev_val_change = remote_true_hashes - local_true_hashes # this will only include remote changes
 
-        altered_collections = local_col_roots - remote_col_roots
-        col_names = []
-        for v in altered_collections:
-            # a set of local collections that were edited
-            temp_col_names = [x for x in cache_state if x != 'world_state' and cache_state[x]['state']['root_hash'] == v]
-            print(temp_col_names)
-            col_names.append(temp_col_names[0])
+        if len(prev_val_change) != 0:
+            log.info("Change happened in remote, prev value, rerun signal sent...")
+            return stack, memory, -2, cache_state, cache_accounts
 
-        for x in col_names:
-            local_tx_hashes = set(cache_state['world_state']['main']['all_hashes'][x].keys())
-            remote_tx_hashes = set(remote_ws_dict['all_hashes'][x].keys())
-
-            is_in_remote = remote_tx_hashes - local_tx_hashes
-            for k in is_in_remote:
-                if k not in cache_deleted:
-                    # new cloud entry
-                    log.info("Change happened in remote, cloud create, rerun signal sent...")
-                    return stack, memory, -2, cache_state, cache_accounts
-            
-            is_in_local = local_tx_hashes - remote_tx_hashes
-            for k in is_in_local:
-                if k in deleted_docs:
-                    # new cloud delete 
-                    log.info("Change happened in remote, cloud delete, rerun signal sent...")
-                    return stack, memory, -2, cache_state, cache_accounts
-            
-            # if no new delete or create happened in cloud, then maybe prev values was updated
-            local_true_hashes = set(cache_state['world_state']['main']['all_hashes'][x].values())
-            remote_true_hashes = set(remote_ws_dict['all_hashes'][x].values())
-            prev_val_change = remote_true_hashes - local_true_hashes
-
-            if len(prev_val_change) != 0:
-                log.info("Change happened in remote, prev value, rerun signal sent...")
-                    return stack, memory, -2, cache_state, cache_accounts
-        
-        map_nested_dicts_modify(self.cache_state, lambda v: float(v) if isinstance(v, Decimal) else v)
-        map_nested_dicts_modify(self.cache_deleted, lambda v: float(v) if isinstance(v, Decimal) else v)
-        map_nested_dicts_modify(self.cache_accounts, lambda v: float(v) if isinstance(v, Decimal) else v)
-        map_nested_dicts_modify(self.cache_ui_txs, lambda v: float(v) if isinstance(v, Decimal) else v)
-        map_nested_dicts_modify(self.cache_verification_data, lambda v: float(v) if isinstance(v, Decimal) else v)
-        map_nested_dicts_modify(self.cache_dashboard_data, lambda v: float(v) if isinstance(v, Decimal) else v)
-        log.info("dicts sanitized")
-
-        for col_name in col_names:
-            col_ref = db.collection(col_name)
-            i = 0
-            log.info(f"committing {col_name} docs...")
-            for id in :
-                doc_ref = col_ref.document(id)
-                batch.set(doc_ref, self.cache_state[col_name][id])
-                batch.commit()
-                i += 1
-                log.info(f"committed entry {i} of {len(self.cache_state[col_name].keys())}")
-
-        log.info(f"all collections committed, committing extra data")
-        
-        del_col_ref = db.collection('deleted')
-        acc_col_ref = db.collection('accounts')
-        tx_ui_col_ref = db.collection('tx_ui')
-        ver_data_col_ref = db.collection('verification_data')
-        dash_col_ref = db.collection('dashboard_data')
-
-        for id in self.cache_deleted:
-            doc_ref = del_col_ref.document(id)
-            batch.set(doc_ref, self.cache_deleted[id])
-        
-        batch.commit()
-        log.info("deleted docs committed")
-        
-        doc_ref = acc_col_ref.document('accounts')
-        batch.set(doc_ref, self.cache_accounts)
-
-        log.info("accounts committed")
-
+        col_ref = db.collection(x)
         i = 0
-        log.info(f"committing UI txs docs...")
-        for id in self.cache_ui_txs:
-            doc_ref = tx_ui_col_ref.document(id)
-            batch.set(doc_ref, self.cache_ui_txs[id])
+        log.info(f"committing {x} docs...")
+        bar = FillingCirclesBar(f'Committing {x}', max=len(cache_state[x].keys()))
+        for id in cache_state[x]:
+            doc_ref = col_ref.document(id)
+            batch.set(doc_ref, cache_state[x][id])
             batch.commit()
             i += 1
-            log.info(f"committed entry {i} of {len(self.cache_ui_txs.keys())}")
+            log.info(f"committed entry {i} of {len(cache_state[x].keys())}: {id}")
+            bar.next()
+        bar.finish()
 
-        log.info("UI transactions committed")
-        
-        doc_ref = ver_data_col_ref.document('verification')
-        batch.set(doc_ref, self.cache_verification_data)
+    log.info(f"all collections committed, committing extra data")
 
-        log.info("Verification data committed")
-        
-        for id in self.cache_dashboard_data:
-            doc_ref = dash_col_ref.document(id)
-            batch.set(doc_ref, self.cache_dashboard_data[id])
-
-        batch.commit()
-        log.info("Data written successfully")
-
-        transaction.update(city_ref, {
-            u'population': snapshot.get(u'population') + 1
-        })
-
-    update_in_transaction(transaction, city_ref)snippets.py
+    bar = FillingCirclesBar(f'Committing deleted', max=len(cache_deleted.keys()) if len(cache_deleted.keys()) != 0 else 1)
+    for id in cache_deleted:
+        doc_ref = del_col_ref.document(id)
+        batch.set(doc_ref, cache_deleted[id])
+        bar.next()
     
+    log.info("deleted docs committed")
+    bar.finish()
+    
+    doc_ref = acc_col_ref.document('accounts')
+    batch.set(doc_ref, cache_accounts)
+
+    log.info("accounts committed")
+
+    i = 0
+    log.info(f"committing UI txs docs...")
+    bar = FillingCirclesBar(f'Committing UI txs', max=len(cache_ui_txs.keys()))
+    for id in cache_ui_txs:
+        doc_ref = tx_ui_col_ref.document(id)
+        batch.set(doc_ref, cache_ui_txs[id])
+        batch.commit()
+        i += 1
+        log.info(f"committed entry {i} of {len(cache_ui_txs.keys())}: {id}")
+        bar.next()
+    bar.finish()
+
+    log.info("UI transactions committed")
+    
+    doc_ref = ver_data_col_ref.document('verification')
+    batch.set(doc_ref, cache_verification_data)
+
+    log.info("Verification data committed")
+    
+    doc_ref = dash_col_ref.document('dashboard')
+    batch.set(doc_ref, cache_dashboard_data)
+    
+    batch.set(world_state_ref, cache_state['world_state']['main'])
+    batch.commit()
+    log.info("world state committed")
+
+    log.info("Data written successfully")
+
+    db.collection('mutex_lock').document('lock').set({'is_lock_held': 0, 'process_name': ''})
+    log.info("Lock released!")
 
     return stack, memory, pc, cache_state, cache_accounts
 
@@ -2102,11 +2090,14 @@ def initialise():
         'available_to_withdraw': {'VICTOR': 0, 'BABRA': 0, 'JEFF': 0},
         'age_of_birds': {'start_date': {'unix': 0, 'locale': ''}, 'age': {'unix': 0, 'years': 0, 'months': 0, 'weeks': 0 }},
         'total_birds': 1, # divide by zero error
-        'root': ''
+        'root': '',
+        'col_roots': [],
+        'all_hashes': {'sales': {}, 'purchases': {}, 'trades': {}, 'eggs_collected': {}, 'dead_sick': {}, 'deleted': {}}
     }
     
     global_state_ref.document('main').set(world_state)
     collection_ref.document('prev_states').set({'0': state })
+    db.collection('mutex_lock').document('lock').set({'is_lock_held': 0, 'process_name': ''})
 
 #initialise()
 
