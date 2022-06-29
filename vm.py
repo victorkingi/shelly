@@ -436,7 +436,7 @@ class VM:
                 if all (k in self.cache_state for k in EVENTC.values()) and 'trays_available' in self.cache_state['world_state']['main']:
                     return True
                 return False
-            case Opcodes.REMOTE.value:
+            case Opcodes.WRITE.value:
                 return True
             case _:
                 log.warning(f"Invalid opcode provided, {instr}")
@@ -568,6 +568,9 @@ class VM:
             else:
                 self.stack, self.memory, self.pc, self.cache_state, self.cache_accounts = inst_mapping[str(val)](stack=self.stack, memory=self.memory, pc=self.pc, analysed=self.analysed_code)
             
+            if self.pc == -2:
+                # re-run signal
+                return None, None, None, -2
             
             if self.pc == -1:
                 # successful completion
@@ -581,7 +584,7 @@ class VM:
                 if self.stack.size():
                     # no update was made to firestore, hence just return computed output
                     log.info(f"execution success, result: {self.stack.peek()}")
-                    return self.stack.pop(), None, None
+                    return self.stack.pop(), None, None, 0
 
                 log.info(f"execution success, replaced {self.memory['TOTALREPLACE']}, created {self.memory['TOTALCREATES']}, deleted {self.memory['TOTALDELETES']} entries")
                 for c in self.memory['ADDED']:
@@ -591,13 +594,13 @@ class VM:
                     log.info(f"collection: {c} entries replaced {self.memory['REPLACED'][c]['num']}")
                     log.info(f"hashes of replaced entries: {[x[:5] for x in self.memory['REPLACED'][c]['hashes']]}")
                 
-                return None, self.cache_state, self.cache_accounts
+                return None, self.cache_state, self.cache_accounts, 0
             
             if self.stack is None and self.pc is None and self.cache_state is None and self.cache_accounts is None:
                 # execution failed
                 log.error("execution failed")
-                return None, None, None
+                return None, None, None, 0
         
         log.error("Unclean exit, no STOP opcode")
-        return None, None, None
+        return None, None, None, 0
 

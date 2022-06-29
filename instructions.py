@@ -1778,18 +1778,153 @@ def update_dashboard_data(stack=None, memory=None, pc=None, analysed=None):
 
 
 # check if a change happened remote
-def compare_with_remote(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: REMOTE")
+# get main root hash compare with local, if same exit, if not
+# get all root hashes, compare with local, if same error, else
+# get set difference of remote and local tx hashes, if remote contains new tx hash and the tx hash is not in deleted, rerun code
+# if local contains new tx hash, check if remote deleted contains same tx hash, if so rerun code,
+# else write (world_state, given collection state & entry itself)
+def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=None):
+    log.debug(f"{pc}: WRITE")
     pc += 1
 
-    col_ref = db.collection('world_state')
-    world_state_doc = col_ref.document('main').get()
-    world_state = world_state_doc.to_dict()
+    ws_col_ref = db.collection('world_state')
+    world_state_ref = col_ref.document('main')
+
+    deleted_col_ref = db.collection('deleted')
+
+    transaction = db.transaction()
+
+    @firestore.transactional
+    def update_in_transaction(transaction, world_state_ref):
+        deleted_ref_docs = deleted_col_ref.stream(transaction=transaction)
+        snapshot = world_state_ref.get(transaction=transaction)
+
+        deleted_docs = {}
+        for doc in deleted_ref_docs:
+            deleted_docs[doc.id] = doc.to_dict()
+
+        remote_ws_dict = snapshot.to_dict()
+        remote_root = remote_ws_dict['root']
+        remote_col_roots = remote_ws_dict['col_roots']
+        local_col_roots = set()
+
+        for k in cache_state:
+            if 'state' in cache_state[k]:
+                local_col_roots.add(cache_state[k]['state']['root_hash'])
+        
+
+        if remote_root == cache_state['world_state']['main']['root']:
+            log.info("Remote and local main root hash match, no changes were made")
+            return stack, memory, pc, cache_state, cache_accounts
+        
+        if set(remote_col_roots) == local_col_roots:
+            log.error(f"Remote and local collection root hashes match when main root don't, {local_col_roots}")
+            return None, None, None, None, None
+        
+
+        altered_collections = local_col_roots - remote_col_roots
+        col_names = []
+        for v in altered_collections:
+            # a set of local collections that were edited
+            temp_col_names = [x for x in cache_state if x != 'world_state' and cache_state[x]['state']['root_hash'] == v]
+            print(temp_col_names)
+            col_names.append(temp_col_names[0])
+
+        for x in col_names:
+            local_tx_hashes = set(cache_state['world_state']['main']['all_hashes'][x].keys())
+            remote_tx_hashes = set(remote_ws_dict['all_hashes'][x].keys())
+
+            is_in_remote = remote_tx_hashes - local_tx_hashes
+            for k in is_in_remote:
+                if k not in cache_deleted:
+                    # new cloud entry
+                    log.info("Change happened in remote, cloud create, rerun signal sent...")
+                    return stack, memory, -2, cache_state, cache_accounts
+            
+            is_in_local = local_tx_hashes - remote_tx_hashes
+            for k in is_in_local:
+                if k in deleted_docs:
+                    # new cloud delete 
+                    log.info("Change happened in remote, cloud delete, rerun signal sent...")
+                    return stack, memory, -2, cache_state, cache_accounts
+            
+            # if no new delete or create happened in cloud, then maybe prev values was updated
+            local_true_hashes = set(cache_state['world_state']['main']['all_hashes'][x].values())
+            remote_true_hashes = set(remote_ws_dict['all_hashes'][x].values())
+            prev_val_change = remote_true_hashes - local_true_hashes
+
+            if len(prev_val_change) != 0:
+                log.info("Change happened in remote, prev value, rerun signal sent...")
+                    return stack, memory, -2, cache_state, cache_accounts
+        
+        map_nested_dicts_modify(self.cache_state, lambda v: float(v) if isinstance(v, Decimal) else v)
+        map_nested_dicts_modify(self.cache_deleted, lambda v: float(v) if isinstance(v, Decimal) else v)
+        map_nested_dicts_modify(self.cache_accounts, lambda v: float(v) if isinstance(v, Decimal) else v)
+        map_nested_dicts_modify(self.cache_ui_txs, lambda v: float(v) if isinstance(v, Decimal) else v)
+        map_nested_dicts_modify(self.cache_verification_data, lambda v: float(v) if isinstance(v, Decimal) else v)
+        map_nested_dicts_modify(self.cache_dashboard_data, lambda v: float(v) if isinstance(v, Decimal) else v)
+        log.info("dicts sanitized")
+
+        for col_name in col_names:
+            col_ref = db.collection(col_name)
+            i = 0
+            log.info(f"committing {col_name} docs...")
+            for id in :
+                doc_ref = col_ref.document(id)
+                batch.set(doc_ref, self.cache_state[col_name][id])
+                batch.commit()
+                i += 1
+                log.info(f"committed entry {i} of {len(self.cache_state[col_name].keys())}")
+
+        log.info(f"all collections committed, committing extra data")
+        
+        del_col_ref = db.collection('deleted')
+        acc_col_ref = db.collection('accounts')
+        tx_ui_col_ref = db.collection('tx_ui')
+        ver_data_col_ref = db.collection('verification_data')
+        dash_col_ref = db.collection('dashboard_data')
+
+        for id in self.cache_deleted:
+            doc_ref = del_col_ref.document(id)
+            batch.set(doc_ref, self.cache_deleted[id])
+        
+        batch.commit()
+        log.info("deleted docs committed")
+        
+        doc_ref = acc_col_ref.document('accounts')
+        batch.set(doc_ref, self.cache_accounts)
+
+        log.info("accounts committed")
+
+        i = 0
+        log.info(f"committing UI txs docs...")
+        for id in self.cache_ui_txs:
+            doc_ref = tx_ui_col_ref.document(id)
+            batch.set(doc_ref, self.cache_ui_txs[id])
+            batch.commit()
+            i += 1
+            log.info(f"committed entry {i} of {len(self.cache_ui_txs.keys())}")
+
+        log.info("UI transactions committed")
+        
+        doc_ref = ver_data_col_ref.document('verification')
+        batch.set(doc_ref, self.cache_verification_data)
+
+        log.info("Verification data committed")
+        
+        for id in self.cache_dashboard_data:
+            doc_ref = dash_col_ref.document(id)
+            batch.set(doc_ref, self.cache_dashboard_data[id])
+
+        batch.commit()
+        log.info("Data written successfully")
+
+        transaction.update(city_ref, {
+            u'population': snapshot.get(u'population') + 1
+        })
+
+    update_in_transaction(transaction, city_ref)snippets.py
     
-
-    for col_name in EVENTC.values():
-        col_ref = db.collection(col_name)
-
 
     return stack, memory, pc, cache_state, cache_accounts
 
@@ -1996,7 +2131,7 @@ inst_mapping = {
     str(Opcodes.ROOTHASH.value): root_hash,
     str(Opcodes.SHA256.value): sha256,
     str(Opcodes.UPDATECACHE.value): update_cache,
-    str(Opcodes.REMOTE.value): compare_with_remote,
+    str(Opcodes.WRITE.value): compare_with_remote_and_write,
     str(Opcodes.VERIFYCOL.value): update_verification_data,
     str(Opcodes.UIENTRIES.value): update_ui_entries,
     str(Opcodes.DASHBOARD.value): update_dashboard_data,

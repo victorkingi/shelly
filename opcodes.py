@@ -61,6 +61,6 @@ class Opcodes(AutoName):
     UIENTRIES = auto()
     VERIFYCOL = auto()
     DASHBOARD = auto()
-    REMOTE = auto()
+    WRITE = auto()
 
 #print(Opcodes.TRAYSAVAIL.value)
