@@ -1881,6 +1881,11 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
         log.info(f"committing {x} docs...")
         bar = FillingCirclesBar(f'Committing {x}', max=len(cache_state[x].keys()) if len(cache_state[x].keys()) != 0 else 1)
         for id in cache_state[x]:
+            if id in remote_ws_dict['all_hashes'][x]:
+                if cache_state[x][id]['true_hash'] == remote_ws_dict['all_hashes'][x][id]:
+                    # silently skip already written data
+                    log.debug(f"skipped {x}: {id}")
+                    continue
             doc_ref = col_ref.document(id)
             batch.set(doc_ref, cache_state[x][id])
             batch.commit()
