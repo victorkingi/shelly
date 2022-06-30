@@ -481,7 +481,7 @@ class VM:
 
         if not self.is_safe:
             log.error("execution failed, check")
-            return None, None, None
+            return None, None, None, None
         
         while self.pc < len(self.code):
             log.debug(f"Stack dump: {self.stack.get_stack()}")
@@ -489,7 +489,7 @@ class VM:
             if not self.is_instr_safe(val, elem=self.code[self.pc+1] if self.pc+1 < len(self.code) and val == Opcodes.PUSH.value else None):
                 res = [name for name, member in Opcodes.__members__.items() if member.value == val]
                 log.error(f"Instruction provided not safe, {val}: {res[0] if len(res) > 0 else res}")
-                return None, None, None
+                return None, None, None, None
 
             if val == Opcodes.PUSH.value:
                 self.stack, self.memory, self.pc, self.cache_state, self.cache_accounts = inst_mapping[str(val)](self.code[self.pc+1], stack=self.stack, memory=self.memory, pc=self.pc, analysed=self.analysed_code)

@@ -1811,10 +1811,16 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
     
     if remote_root == cache_state['world_state']['main']['root']:
         log.info("Remote and local main root hash match, no changes were made")
+
+        db.collection('mutex_lock').document('lock').set({'is_lock_held': 0, 'process_name': ''})
+        log.info("Lock released!")
         return stack, memory, pc, cache_state, cache_accounts
     
     if remote_col_roots == local_col_roots:
         log.error(f"Remote and local collection root hashes match when main root don't, {local_col_roots}")
+
+        db.collection('mutex_lock').document('lock').set({'is_lock_held': 0, 'process_name': ''})
+        log.info("Lock released!")
         return None, None, None, None, None
 
     altered_collections = local_col_roots - remote_col_roots
@@ -1836,6 +1842,9 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
             if k not in cache_deleted:
                 # new cloud entry
                 log.info("Change happened in remote, cloud create, rerun signal sent...")
+
+                db.collection('mutex_lock').document('lock').set({'is_lock_held': 0, 'process_name': ''})
+                log.info("Lock released!")
                 return stack, memory, -2, cache_state, cache_accounts
         
         is_in_local = local_tx_hashes - remote_tx_hashes
@@ -1843,6 +1852,9 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
             if k in remote_ws_dict['all_hashes']['deleted'].keys():
                 # new cloud delete 
                 log.info("Change happened in remote, cloud delete, rerun signal sent...")
+
+                db.collection('mutex_lock').document('lock').set({'is_lock_held': 0, 'process_name': ''})
+                log.info("Lock released!")
                 return stack, memory, -2, cache_state, cache_accounts
         
         # if no new delete or create happened in cloud, then maybe prev values was updated
@@ -1852,12 +1864,15 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
 
         if len(prev_val_change) != 0:
             log.info("Change happened in remote, prev value, rerun signal sent...")
+
+            db.collection('mutex_lock').document('lock').set({'is_lock_held': 0, 'process_name': ''})
+            log.info("Lock released!")
             return stack, memory, -2, cache_state, cache_accounts
 
         col_ref = db.collection(x)
         i = 0
         log.info(f"committing {x} docs...")
-        bar = FillingCirclesBar(f'Committing {x}', max=len(cache_state[x].keys()))
+        bar = FillingCirclesBar(f'Committing {x}', max=len(cache_state[x].keys()) if len(cache_state[x].keys()) != 0 else 1)
         for id in cache_state[x]:
             doc_ref = col_ref.document(id)
             batch.set(doc_ref, cache_state[x][id])
@@ -1865,6 +1880,7 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
             i += 1
             log.info(f"committed entry {i} of {len(cache_state[x].keys())}: {id}")
             bar.next()
+        bar.next()
         bar.finish()
 
     log.info(f"all collections committed, committing extra data")
@@ -1874,7 +1890,7 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
         doc_ref = del_col_ref.document(id)
         batch.set(doc_ref, cache_deleted[id])
         bar.next()
-    
+    bar.next()
     log.info("deleted docs committed")
     bar.finish()
     
@@ -1883,9 +1899,15 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
 
     log.info("accounts committed")
 
+    doc_ref = dash_col_ref.document('dashboard')
+    batch.set(doc_ref, cache_dashboard_data)
+
+    log.info("dashboard data written")
+    print("written", cache_dashboard_data)
+
     i = 0
     log.info(f"committing UI txs docs...")
-    bar = FillingCirclesBar(f'Committing UI txs', max=len(cache_ui_txs.keys()))
+    bar = FillingCirclesBar(f'Committing UI txs', max=len(cache_ui_txs.keys()) if len(cache_ui_txs.keys()) != 0 else 1)
     for id in cache_ui_txs:
         doc_ref = tx_ui_col_ref.document(id)
         batch.set(doc_ref, cache_ui_txs[id])
@@ -1893,6 +1915,7 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
         i += 1
         log.info(f"committed entry {i} of {len(cache_ui_txs.keys())}: {id}")
         bar.next()
+    bar.next()
     bar.finish()
 
     log.info("UI transactions committed")
@@ -1901,9 +1924,6 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
     batch.set(doc_ref, cache_verification_data)
 
     log.info("Verification data committed")
-    
-    doc_ref = dash_col_ref.document('dashboard')
-    batch.set(doc_ref, cache_dashboard_data)
     
     batch.set(world_state_ref, cache_state['world_state']['main'])
     batch.commit()
