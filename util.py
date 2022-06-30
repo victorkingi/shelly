@@ -228,6 +228,9 @@ def map_nested_dicts_modify(ob, func):
     for k, v in ob.items():
         if isinstance(v, collections.abc.Mapping):
             map_nested_dicts_modify(v, func)
+        elif isinstance(v, list):
+            for idx, x in enumerate(v):
+                ob[k][idx] = func(x)
         else:
             ob[k] = func(v)
 

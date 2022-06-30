@@ -600,9 +600,10 @@ def create_entry(stack=None, memory=None, pc=None, analysed=None):
         else:
             cache_state[EVENTC[SELL]][tx_hash] = cache_state[EVENTC[SELL]]['temp']
         
-        cache_state[EVENTC[SELL]]['state']['all_tx_hashes'][tx_hash] = cache_state[EVENTC[SELL]][tx_hash]['submitted_on']
+        cache_state[EVENTC[SELL]]['state']['all_tx_hashes'][tx_hash] = dict(cache_state[EVENTC[SELL]][tx_hash]['submitted_on'])
         cache_state[EVENTC[SELL]]['state']['all_tx_hashes'][tx_hash]['true_hash'] = get_true_hash_for_tx(cache_state[EVENTC[SELL]][tx_hash], EVENTC[SELL])
         cache_state['world_state']['main']['all_hashes'][EVENTC[SELL]][tx_hash] = get_true_hash_for_tx(cache_state[EVENTC[SELL]][tx_hash], EVENTC[SELL])
+        cache_state[EVENTC[SELL]][tx_hash]['true_hash'] = get_true_hash_for_tx(cache_state[EVENTC[SELL]][tx_hash], EVENTC[SELL])
         del cache_state[EVENTC[SELL]]['temp']
 
     elif entry_name == BUY:
@@ -645,9 +646,10 @@ def create_entry(stack=None, memory=None, pc=None, analysed=None):
         else:
             cache_state[EVENTC[BUY]][tx_hash] = cache_state[EVENTC[BUY]]['temp']
 
-        cache_state[EVENTC[BUY]]['state']['all_tx_hashes'][tx_hash] = cache_state[EVENTC[BUY]][tx_hash]['submitted_on']
+        cache_state[EVENTC[BUY]]['state']['all_tx_hashes'][tx_hash] = dict(cache_state[EVENTC[BUY]][tx_hash]['submitted_on'])
         cache_state[EVENTC[BUY]]['state']['all_tx_hashes'][tx_hash]['true_hash'] = get_true_hash_for_tx(cache_state[EVENTC[BUY]][tx_hash], EVENTC[BUY])
         cache_state['world_state']['main']['all_hashes'][EVENTC[BUY]][tx_hash] = get_true_hash_for_tx(cache_state[EVENTC[BUY]][tx_hash], EVENTC[BUY])
+        cache_state[EVENTC[BUY]][tx_hash]['true_hash'] = get_true_hash_for_tx(cache_state[EVENTC[BUY]][tx_hash], EVENTC[BUY])
         del cache_state[EVENTC[BUY]]['temp']
 
     elif entry_name == DS:
@@ -690,9 +692,10 @@ def create_entry(stack=None, memory=None, pc=None, analysed=None):
         else:
             cache_state[EVENTC[DS]][tx_hash] = cache_state[EVENTC[DS]]['temp']
         
-        cache_state[EVENTC[DS]]['state']['all_tx_hashes'][tx_hash] = cache_state[EVENTC[DS]][tx_hash]['submitted_on']
+        cache_state[EVENTC[DS]]['state']['all_tx_hashes'][tx_hash] = dict(cache_state[EVENTC[DS]][tx_hash]['submitted_on'])
         cache_state[EVENTC[DS]]['state']['all_tx_hashes'][tx_hash]['true_hash'] = get_true_hash_for_tx(cache_state[EVENTC[DS]][tx_hash], EVENTC[DS])
         cache_state['world_state']['main']['all_hashes'][EVENTC[DS]][tx_hash] = get_true_hash_for_tx(cache_state[EVENTC[DS]][tx_hash], EVENTC[DS])
+        cache_state[EVENTC[DS]][tx_hash]['true_hash'] = get_true_hash_for_tx(cache_state[EVENTC[DS]][tx_hash], EVENTC[DS])
         del cache_state[EVENTC[DS]]['temp']
         
     elif entry_name == EGGS:
@@ -734,9 +737,10 @@ def create_entry(stack=None, memory=None, pc=None, analysed=None):
         else:
             cache_state[EVENTC[EGGS]][tx_hash] = cache_state[EVENTC[EGGS]]['temp']
 
-        cache_state[EVENTC[EGGS]]['state']['all_tx_hashes'][tx_hash] = cache_state[EVENTC[EGGS]][tx_hash]['submitted_on']
+        cache_state[EVENTC[EGGS]]['state']['all_tx_hashes'][tx_hash] = dict(cache_state[EVENTC[EGGS]][tx_hash]['submitted_on'])
         cache_state[EVENTC[EGGS]]['state']['all_tx_hashes'][tx_hash]['true_hash'] = get_true_hash_for_tx(cache_state[EVENTC[EGGS]][tx_hash], EVENTC[EGGS])
         cache_state['world_state']['main']['all_hashes'][EVENTC[EGGS]][tx_hash] = get_true_hash_for_tx(cache_state[EVENTC[EGGS]][tx_hash], EVENTC[EGGS])
+        cache_state[EVENTC[EGGS]][tx_hash]['true_hash'] = get_true_hash_for_tx(cache_state[EVENTC[EGGS]][tx_hash], EVENTC[EGGS])
         del cache_state[EVENTC[EGGS]]['temp']
 
     elif entry_name == TRADE:
@@ -779,9 +783,10 @@ def create_entry(stack=None, memory=None, pc=None, analysed=None):
         else:
             cache_state[EVENTC[TRADE]][tx_hash] = cache_state[EVENTC[TRADE]]['temp']
 
-        cache_state[EVENTC[TRADE]]['state']['all_tx_hashes'][tx_hash] = cache_state[EVENTC[TRADE]][tx_hash]['submitted_on']
+        cache_state[EVENTC[TRADE]]['state']['all_tx_hashes'][tx_hash] = dict(cache_state[EVENTC[TRADE]][tx_hash]['submitted_on'])
         cache_state[EVENTC[TRADE]]['state']['all_tx_hashes'][tx_hash]['true_hash'] = get_true_hash_for_tx(cache_state[EVENTC[TRADE]][tx_hash], EVENTC[TRADE])
         cache_state['world_state']['main']['all_hashes'][EVENTC[TRADE]][tx_hash] = get_true_hash_for_tx(cache_state[EVENTC[TRADE]][tx_hash], EVENTC[TRADE])
+        cache_state[EVENTC[TRADE]][tx_hash]['true_hash'] = get_true_hash_for_tx(cache_state[EVENTC[TRADE]][tx_hash], EVENTC[TRADE])
         del cache_state[EVENTC[TRADE]]['temp']
 
     if not is_replaced:
@@ -1724,6 +1729,7 @@ def update_dashboard_data(stack=None, memory=None, pc=None, analysed=None):
         if i == 5:
             break
 
+    global cache_dashboard_data
     cache_dashboard_data = {
         'week_profit': week_profit,
         'month_profit': month_profit,
@@ -1828,7 +1834,6 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
     for v in altered_collections:
         # a set of local collections that were edited
         temp_col_names = [x for x in cache_state if x != 'world_state' and cache_state[x]['state']['root_hash'] == v]
-        print(temp_col_names)
         col_names.append(temp_col_names[0])
 
     batch = db.batch()
@@ -1899,12 +1904,6 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
 
     log.info("accounts committed")
 
-    doc_ref = dash_col_ref.document('dashboard')
-    batch.set(doc_ref, cache_dashboard_data)
-
-    log.info("dashboard data written")
-    print("written", cache_dashboard_data)
-
     i = 0
     log.info(f"committing UI txs docs...")
     bar = FillingCirclesBar(f'Committing UI txs', max=len(cache_ui_txs.keys()) if len(cache_ui_txs.keys()) != 0 else 1)
@@ -1924,6 +1923,11 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
     batch.set(doc_ref, cache_verification_data)
 
     log.info("Verification data committed")
+
+    doc_ref = dash_col_ref.document('dashboard')
+    batch.set(doc_ref, cache_dashboard_data)
+
+    log.info("dashboard data written")
     
     batch.set(world_state_ref, cache_state['world_state']['main'])
     batch.commit()
