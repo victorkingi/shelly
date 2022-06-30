@@ -439,7 +439,7 @@ class VM:
                     return True
                 return False
             case Opcodes.WRITE.value:
-                return True
+                return 'root' in self.cache_state['world_state']['main'] if 'world_state' in self.cache_state else False
             case _:
                 log.warning(f"Invalid opcode provided, {instr}")
                 return False
