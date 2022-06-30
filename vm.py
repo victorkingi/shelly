@@ -427,7 +427,7 @@ class VM:
             case Opcodes.TRAYSAVAIL.value:
                 return self.stack.size() > 1 and isinstance(self.stack.peek(), Decimal) and isinstance(self.stack.peek2(), Decimal)
             case Opcodes.UIENTRIES.value:
-                if all (k in self.cache_state for k in EVENTC.values()):
+                if all (k in self.cache_state for k in EVENTC.values()) and ('all_hashes' in cache_state['world_state']['main'] if 'world_state' in cache_state):
                     return True
                 return False
             case Opcodes.VERIFYCOL.value:
