@@ -11,7 +11,7 @@ import sys
 import re
 
 from opcodes import Opcodes
-from util import *
+from util_ import *
 from log_ import log
 from constants import *
 
@@ -21,9 +21,6 @@ import firebase_admin
 
 getcontext().traps[FloatOperation] = True
 TWOPLACES = Decimal(10) ** -2 
-
-other = 'other'
-starting_birds_no = Decimal(500)
 
 cred = credentials.Certificate("poultry101-6b1ed-firebase-adminsdk-4h0rk-4b8268dd31.json")
 firebase_admin.initialize_app(cred)
@@ -1323,7 +1320,7 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
                 cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_given'] = aggregate_week_percent['given'] / Decimal(7)
 
                 try:
-                    cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_given'] = cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_exact'].quantize(TWOPLACES)
+                    cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_given'] = cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_given'].quantize(TWOPLACES)
                     cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_exact'] = cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_exact'].quantize(TWOPLACES)
 
                 except InvalidOperation:
@@ -1350,7 +1347,7 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
                 cache_state[EVENTC[EGGS]]['state']['month_trays_and_exact'][x]['percent_given'] = aggregate_month_percent['given'] / Decimal(28)
 
                 try:
-                    cache_state[EVENTC[EGGS]]['state']['month_trays_and_exact'][x]['percent_given'] = cache_state[EVENTC[EGGS]]['state']['month_trays_and_exact'][x]['percent_exact'].quantize(TWOPLACES)
+                    cache_state[EVENTC[EGGS]]['state']['month_trays_and_exact'][x]['percent_given'] = cache_state[EVENTC[EGGS]]['state']['month_trays_and_exact'][x]['percent_given'].quantize(TWOPLACES)
                     cache_state[EVENTC[EGGS]]['state']['month_trays_and_exact'][x]['percent_exact'] = cache_state[EVENTC[EGGS]]['state']['month_trays_and_exact'][x]['percent_exact'].quantize(TWOPLACES)
 
                 except InvalidOperation:
@@ -1372,7 +1369,7 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
                 cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_given'] = aggregate_week_percent['given'] / Decimal(7)
 
                 try:
-                    cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_given'] = cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_exact'].quantize(TWOPLACES)
+                    cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_given'] = cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_given'].quantize(TWOPLACES)
                     cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_exact'] = cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_exact'].quantize(TWOPLACES)
 
                 except InvalidOperation:
@@ -1836,7 +1833,9 @@ def update_dashboard_data(stack=None, memory=None, pc=None, analysed=None):
             break
 
     # chart data for week laying percent
-
+    y_axis_exact = [v['percent_exact'] if 'percent_exact' in v else Decimal(0) for _, v in cache_state['eggs_collected']['state']['week_trays_and_exact'].items()]
+    y_axis_given = [v['percent_given'] if 'percent_given' in v else Decimal(0) for _, v in cache_state['eggs_collected']['state']['week_trays_and_exact'].items()]
+    x_axis = [Decimal(k) for k in cache_state['eggs_collected']['state']['week_trays_and_exact']]
 
     global cache_dashboard_data
     cache_dashboard_data = {
@@ -1848,7 +1847,9 @@ def update_dashboard_data(stack=None, memory=None, pc=None, analysed=None):
         'owe': amount_owe,
         'laying': laying_data,
         'trays_avail': trays_avail,
-        'last_trades': last_trades
+        'last_trades': last_trades,
+        'week_laying_chart_exact': to_area_chart_dict(x_axis=x_axis, y_axis=y_axis_exact, label='Exact'),
+        'week_laying_chart_given': to_area_chart_dict(x_axis=x_axis, y_axis=y_axis_given, label='Given')
     }
 
     log.info(f"Dashboard data updated")

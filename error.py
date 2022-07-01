@@ -1,5 +1,5 @@
 # ERRORS
-from util import string_with_arrows
+from util_ import string_with_arrows
 
 class Error:
     def __init__(self, error_name_, pos_start_=None, pos_end_=None, details_=None):

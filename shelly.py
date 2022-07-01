@@ -5,7 +5,7 @@ import sys
 from decimal import *
 from log_ import fh
 from common_opcodes import *
-from util import map_nested_dicts_modify
+from util_ import map_nested_dicts_modify
 from test_data import create_instr
 import json
 

@@ -5,7 +5,7 @@ import json
 from constants import *
 from opcodes import Opcodes
 from common_opcodes import CommonOps
-from util import get_eggs
+from util_ import get_eggs
 from decimal import *
 from datetime import datetime
 

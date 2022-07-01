@@ -5,12 +5,11 @@ import random
 from decimal import *
 from functools import reduce
 from log_ import log
-from constants import CREATE, DELETE
+from constants import CREATE, DELETE, starting_birds_no, eggs_in_tray
 import collections.abc
 
 getcontext().traps[FloatOperation] = True
-TWOPLACES = Decimal(10) ** -2 
-eggs_in_tray = Decimal(30)
+TWOPLACES = Decimal(10) ** -2
 
 
 def get_true_hash_for_tx(tx, collection_name):
@@ -264,14 +263,10 @@ def to_area_chart_dict(x_axis=[], y_axis=[], label=''):
 def laying_percent_for_a_day(unix_epoch, dead_docs, eggs):
     vals = [ Decimal(value['number']) for key, value in dead_docs.items() if key != 'state' and key != 'prev_states' and dead_docs[key]['section'] == 'DEAD' and Decimal(str(dead_docs[key]['date']['unix'])) <= unix_epoch ]
     all_dead = reduce(lambda a, b: a + b, vals, 0)
-    rem_birds = 500 - all_dead
-
-    total_eggs = Decimal('NaN')
-    percent = Decimal('NaN')
+    rem_birds = starting_birds_no - all_dead
     
     total_eggs = get_eggs(eggs)[1]
     percent = (total_eggs / Decimal(rem_birds)) * Decimal(100)
-
     try:
         percent = percent.quantize(TWOPLACES)
     except InvalidOperation:

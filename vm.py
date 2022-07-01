@@ -11,7 +11,7 @@ from opcodes import Opcodes
 from log_ import log
 from stack import Stack
 from instructions import inst_mapping, get_dicts, db
-from util import map_nested_dicts_modify
+from util_ import map_nested_dicts_modify
 from constants import *
 
 EARLIEST_VALID_YEAR = 1577836800 # unix epoch of earliest reasonable data date which is 1st january midnight 2020
