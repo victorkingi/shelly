@@ -1176,7 +1176,17 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
             for sec in sections:
                 state[f'total_eggs_{sec}'] += tx[sec]
             
-            state['trays_collected_to_timestamp'][str(tx['date']['unix'])] = tx['trays_collected']
+            percent_exact = laying_percent_for_a_day(tx['date']['unix'], cache_state['dead_sick'], get_eggs(amount)[0])
+            percent_trays_collected = laying_percent_for_a_day(tx['date']['unix'], cache_state['dead_sick'], get_eggs(tx['trays_collected'])[0])
+            if percent_exact is None or percent_trays_collected is None:
+                return None, None, None, None, None
+
+            state['trays_collected_to_timestamp'][str(tx['date']['unix'])] = {
+                'trays_collected': tx['trays_collected'],
+                'exact': get_eggs(amount)[0],
+                'percent_exact': percent_exact,
+                'percent_trays_collected': percent_trays_collected
+            }
             state['diff_trays_to_exact'][str(tx['date']['unix'])] = get_eggs_diff(tx['trays_collected'], amount)[0]
 
             # check if new week or new month
@@ -1291,9 +1301,103 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
                 else:
                     cache_state[collection_name]['state']['total_dead'] = Decimal(tx['number'])
         
-
         i += 1
+    
+    
+    if collection_name == EVENTC[EGGS]:
+        sorted_tuples = sorted(cache_state[EVENTC[EGGS]]['state']['trays_collected_to_timestamp'].items(), key=lambda item: Decimal(item[0]))
+        cache_state[EVENTC[EGGS]]['state']['trays_collected_to_timestamp'] = {k: v for k, v in sorted_tuples}
+        i_w = 0
+        i_m = 0
+        aggregate_week_percent = {
+            'exact': Decimal(0),
+            'given': Decimal(0)
+        }
+        aggregate_month_percent = {
+            'exact': Decimal(0),
+            'given': Decimal(0)
+        }
+        for x in cache_state[EVENTC[EGGS]]['state']['trays_collected_to_timestamp']:
+            if i_w == 7 and i_m == 28:
+                cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_exact'] = aggregate_week_percent['exact'] / Decimal(7)
+                cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_given'] = aggregate_week_percent['given'] / Decimal(7)
 
+                try:
+                    cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_given'] = cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_exact'].quantize(TWOPLACES)
+                    cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_exact'] = cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_exact'].quantize(TWOPLACES)
+
+                except InvalidOperation:
+                    log.error(f"Invalid Decimal Operation on week percent, value: {cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_given']}, {cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_exact']}")
+                    return None, None, None, None, None
+                
+                aggregate_week_percent = {
+                    'exact': cache_state[EVENTC[EGGS]]['state']['trays_collected_to_timestamp'][x]['percent_exact'],
+                    'given': cache_state[EVENTC[EGGS]]['state']['trays_collected_to_timestamp'][x]['percent_trays_collected']
+                }
+                i_w = 0
+
+                cache_state[EVENTC[EGGS]]['state']['month_trays_and_exact'][x]['percent_exact'] = aggregate_month_percent['exact'] / Decimal(28)
+                cache_state[EVENTC[EGGS]]['state']['month_trays_and_exact'][x]['percent_given'] = aggregate_month_percent['given'] / Decimal(28)
+                
+                aggregate_month_percent = {
+                    'exact': cache_state[EVENTC[EGGS]]['state']['trays_collected_to_timestamp'][x]['percent_exact'],
+                    'given': cache_state[EVENTC[EGGS]]['state']['trays_collected_to_timestamp'][x]['percent_trays_collected']
+                }
+                i_m = 0
+
+            elif i_w != 7 and i_m == 28:
+                cache_state[EVENTC[EGGS]]['state']['month_trays_and_exact'][x]['percent_exact'] = aggregate_month_percent['exact'] / Decimal(28)
+                cache_state[EVENTC[EGGS]]['state']['month_trays_and_exact'][x]['percent_given'] = aggregate_month_percent['given'] / Decimal(28)
+
+                try:
+                    cache_state[EVENTC[EGGS]]['state']['month_trays_and_exact'][x]['percent_given'] = cache_state[EVENTC[EGGS]]['state']['month_trays_and_exact'][x]['percent_exact'].quantize(TWOPLACES)
+                    cache_state[EVENTC[EGGS]]['state']['month_trays_and_exact'][x]['percent_exact'] = cache_state[EVENTC[EGGS]]['state']['month_trays_and_exact'][x]['percent_exact'].quantize(TWOPLACES)
+
+                except InvalidOperation:
+                    log.error(f"Invalid Decimal Operation on month percent, value: {cache_state[EVENTC[EGGS]]['state']['month_trays_and_exact'][x]['percent_given']}, {cache_state[EVENTC[EGGS]]['state']['month_trays_and_exact'][x]['percent_exact']}")
+                    return None, None, None, None, None
+                
+                
+                aggregate_month_percent = {
+                    'exact': cache_state[EVENTC[EGGS]]['state']['trays_collected_to_timestamp'][x]['percent_exact'],
+                    'given': cache_state[EVENTC[EGGS]]['state']['trays_collected_to_timestamp'][x]['percent_trays_collected']
+                }
+                i_m = 0
+
+                aggregate_week_percent['exact'] += cache_state[EVENTC[EGGS]]['state']['trays_collected_to_timestamp'][x]['percent_exact']
+                aggregate_week_percent['given'] += cache_state[EVENTC[EGGS]]['state']['trays_collected_to_timestamp'][x]['percent_trays_collected']
+            
+            elif i_w == 7 and i_m != 28:
+                cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_exact'] = aggregate_week_percent['exact'] / Decimal(7)
+                cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_given'] = aggregate_week_percent['given'] / Decimal(7)
+
+                try:
+                    cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_given'] = cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_exact'].quantize(TWOPLACES)
+                    cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_exact'] = cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_exact'].quantize(TWOPLACES)
+
+                except InvalidOperation:
+                    log.error(f"Invalid Decimal Operation on week percent, value: {cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_given']}, {cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_exact']}")
+                    return None, None, None, None, None
+                
+                aggregate_week_percent = {
+                    'exact': cache_state[EVENTC[EGGS]]['state']['trays_collected_to_timestamp'][x]['percent_exact'],
+                    'given': cache_state[EVENTC[EGGS]]['state']['trays_collected_to_timestamp'][x]['percent_trays_collected']
+                }
+                i_w = 0
+
+                aggregate_month_percent['exact'] += cache_state[EVENTC[EGGS]]['state']['trays_collected_to_timestamp'][x]['percent_exact']
+                aggregate_month_percent['given'] += cache_state[EVENTC[EGGS]]['state']['trays_collected_to_timestamp'][x]['percent_trays_collected']
+            
+            else:
+                aggregate_week_percent['exact'] += cache_state[EVENTC[EGGS]]['state']['trays_collected_to_timestamp'][x]['percent_exact']
+                aggregate_week_percent['given'] += cache_state[EVENTC[EGGS]]['state']['trays_collected_to_timestamp'][x]['percent_trays_collected']
+
+                aggregate_month_percent['exact'] += cache_state[EVENTC[EGGS]]['state']['trays_collected_to_timestamp'][x]['percent_exact']
+                aggregate_month_percent['given'] += cache_state[EVENTC[EGGS]]['state']['trays_collected_to_timestamp'][x]['percent_trays_collected']
+            
+            i_w += 1
+            i_m += 1
+    
     return stack, memory, pc, cache_state, cache_accounts
 
 
@@ -1632,7 +1736,8 @@ def update_ui_entries(stack=None, memory=None, pc=None, analysed=None):
                 'hash': hash,
                 'status': Decimal(1),
                 'submitted_on': cache_state[col_name][hash]['submitted_on']['unix'],
-                'type': type
+                'type': type,
+                'data': cache_state[col_name][hash]
             }
     log.info(f"UI transactions updated")
 
@@ -1702,7 +1807,7 @@ def update_dashboard_data(stack=None, memory=None, pc=None, analysed=None):
     def get_laying_change_percent(period):
         laying_keys = cache_state['world_state']['main'][f'{period}_laying_percent'].keys()
         laying_percent = cache_state['world_state']['main'][f'{period}_laying_percent'][max(laying_keys)]
-        change = get_eggs(cache_state['eggs_collected']['state']['change_week'][max(laying_keys)]['trays_collected'])[1]
+        change = get_eggs(cache_state['eggs_collected']['state'][f'change_{period}'][max(laying_keys)]['trays_collected'])[1]
         in_seconds = 7 * 24 * 60 * 60
         if period == 'month':
             in_seconds = 28 * 24 * 60 * 60
@@ -1730,6 +1835,9 @@ def update_dashboard_data(stack=None, memory=None, pc=None, analysed=None):
         if i == 5:
             break
 
+    # chart data for week laying percent
+
+
     global cache_dashboard_data
     cache_dashboard_data = {
         'week_profit': week_profit,
@@ -1740,7 +1848,7 @@ def update_dashboard_data(stack=None, memory=None, pc=None, analysed=None):
         'owe': amount_owe,
         'laying': laying_data,
         'trays_avail': trays_avail,
-        'last_trades': last_trades 
+        'last_trades': last_trades
     }
 
     log.info(f"Dashboard data updated")

@@ -1,12 +1,15 @@
 # UTILITIES
 
 import hashlib
+import random
 from decimal import *
+from functools import reduce
 from log_ import log
 from constants import CREATE, DELETE
 import collections.abc
 
-
+getcontext().traps[FloatOperation] = True
+TWOPLACES = Decimal(10) ** -2 
 eggs_in_tray = Decimal(30)
 
 
@@ -233,6 +236,49 @@ def map_nested_dicts_modify(ob, func):
                 ob[k][idx] = func(x)
         else:
             ob[k] = func(v)
+
+
+def rgba_random_generator(alpha=1):
+    return f'rgba({random.randint(0, 255)}, {random.randint(0, 255)}, {random.randint(0, 255)}, {alpha})'
+
+
+def to_area_chart_dict(x_axis=[], y_axis=[], label=''):
+    if len(x_axis) != len(y_axis):
+        return None
+    data = {
+        'backgroundColor': [],
+        'borderColor': [],
+        'label': label,
+        'y': y_axis,
+        'x': x_axis
+    }
+    labels = []
+
+    for idx, _ in enumerate(x_axis):
+        data['backgroundColor'].append(rgba_random_generator(alpha=0.2))
+        data['borderColor'].append(rgba_random_generator(alpha=1))
+
+    return data
+
+# given a date, get laying percent on that day
+def laying_percent_for_a_day(unix_epoch, dead_docs, eggs):
+    vals = [ Decimal(value['number']) for key, value in dead_docs.items() if key != 'state' and key != 'prev_states' and dead_docs[key]['section'] == 'DEAD' and Decimal(str(dead_docs[key]['date']['unix'])) <= unix_epoch ]
+    all_dead = reduce(lambda a, b: a + b, vals, 0)
+    rem_birds = 500 - all_dead
+
+    total_eggs = Decimal('NaN')
+    percent = Decimal('NaN')
+    
+    total_eggs = get_eggs(eggs)[1]
+    percent = (total_eggs / Decimal(rem_birds)) * Decimal(100)
+
+    try:
+        percent = percent.quantize(TWOPLACES)
+    except InvalidOperation:
+        log.error(f"Invalid Decimal Operation on daily laying percent, value: {percent}")
+        return None
+
+    return percent
 
 
 def get_collection_hashes(collection_name, cache_state):
