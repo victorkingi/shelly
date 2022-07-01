@@ -1627,8 +1627,6 @@ def update_ui_entries(stack=None, memory=None, pc=None, analysed=None):
         for hash in cache_state[col_name]:
             if hash == 'state' or hash == 'prev_states':
                 continue
-            if hash in cache_state['world_state']['main']['all_hashes'][col_name]:
-                continue
             cache_ui_txs[hash] = {
                 'date': cache_state[col_name][hash]['date']['unix'],
                 'hash': hash,
@@ -1916,6 +1914,11 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
     log.info(f"committing UI txs docs...")
     bar = FillingCirclesBar(f'Committing UI txs', max=len(cache_ui_txs.keys()) if len(cache_ui_txs.keys()) != 0 else 1)
     for id in cache_ui_txs:
+        for x in EVENTC.values():
+            if id in remote_ws_dict['all_hashes'][x]:
+                # silently skip already written data
+                log.debug(f"skipped UI tx {x}: {id}")
+                continue
         doc_ref = tx_ui_col_ref.document(id)
         batch.set(doc_ref, cache_ui_txs[id])
         batch.commit()
