@@ -386,7 +386,7 @@
         "c2": 64,
         "broken": 2,
         "house": 26,
-        "trays_collected": "79,21",
+        "trays_collected": "12,19",
         "by": "PURITY",
         "date": 1622235600,
         "submitted_on": 1622658004
@@ -484,7 +484,7 @@
         "c2": 56,
         "broken": 3,
         "house": 29,
-        "trays_collected": "67,2",
+        "trays_collected": "12,17",
         "by": "PURITY",
         "date": 1622149200,
         "submitted_on": 1622657949
@@ -708,7 +708,7 @@
         "c2": 53,
         "broken": 1,
         "house": 25,
-        "trays_collected": "65,3",
+        "trays_collected": "11,23",
         "by": "BABRA",
         "date": 1621198800,
         "submitted_on": 1621670772
@@ -1058,7 +1058,7 @@
         "c2": 47,
         "broken": 2,
         "house": 26,
-        "trays_collected": "53,10",
+        "trays_collected": "11,11",
         "by": "BABRA",
         "date": 1621112400,
         "submitted_on": 1621670721
@@ -2122,7 +2122,7 @@
         "c2": 58,
         "broken": 1,
         "house": 26,
-        "trays_collected": "43,4",
+        "trays_collected": "12,12",
         "by": "PURITY",
         "date": 1621976400,
         "submitted_on": 1622657833
@@ -2304,7 +2304,7 @@
         "c2": 63,
         "broken": 2,
         "house": 24,
-        "trays_collected": "54,14",
+        "trays_collected": "12,10",
         "by": "PURITY",
         "date": 1622062800,
         "submitted_on": 1622657887
@@ -2430,7 +2430,7 @@
         "c2": 68,
         "broken": 3,
         "house": 29,
-        "trays_collected": "30,17",
+        "trays_collected": "12,11",
         "by": "PURITY",
         "date": 1621717200,
         "submitted_on": 1622657580
@@ -2794,7 +2794,7 @@
         "c2": 63,
         "broken": 26,
         "house": 54,
-        "trays_collected": "35,28",
+        "trays_collected": "14,10",
         "by": "PURITY",
         "date": 1621803600,
         "submitted_on": 1622657653
@@ -3032,7 +3032,7 @@
         "c2": 58,
         "broken": 2,
         "house": 25,
-        "trays_collected": "73,24",
+        "trays_collected": "11,21",
         "by": "BABRA",
         "date": 1621285200,
         "submitted_on": 1621670855
@@ -3662,7 +3662,7 @@
         "c2": 54,
         "broken": 1,
         "house": 26,
-        "trays_collected": "48,22",
+        "trays_collected": "12,23",
         "by": "PURITY",
         "date": 1621890000,
         "submitted_on": 1622657734
@@ -3704,7 +3704,7 @@
         "c2": 38,
         "broken": 4,
         "house": 13,
-        "trays_collected": "29,5",
+        "trays_collected": "8,19",
         "by": "BABRA",
         "date": 1620939600,
         "submitted_on": 1621670445
@@ -4586,7 +4586,7 @@
         "c2": 64,
         "broken": 4,
         "house": 29,
-        "trays_collected": "42,0",
+        "trays_collected": "12,25",
         "by": "BABRA",
         "date": 1621026000,
         "submitted_on": 1621670625

@@ -14,6 +14,7 @@ from opcodes import Opcodes
 from util_ import *
 from log_ import log
 from constants import *
+from common_opcodes import CommonOps
 
 import time
 import hashlib
@@ -2232,7 +2233,7 @@ def initialise():
         'month_profit': {'0': 0 },
         'total_profit': 0,
         'available_to_withdraw': {'VICTOR': 0, 'BABRA': 0, 'JEFF': 0},
-        'age_of_birds': {'start_date': {'unix': 0, 'locale': ''}, 'age': {'unix': 0, 'years': 0, 'months': 0, 'weeks': 0 }},
+        'age_of_birds': {'start_date': {'unix': 1583746320, 'locale': '03/09/2020, 12:32:00, Africa/Nairobi'}, 'age': {'unix': time.time() - 1583746320, 'years': (time.time() - 1583746320) / (12 * 4 * 7 * 24 * 60 * 60), 'months': (time.time() - 1583746320) / (4 * 7 * 24 * 60 * 60), 'weeks': (time.time() - 1583746320) / (7 * 24 * 60 * 60) }},
         'total_birds': 1, # divide by zero error
         'root': '',
         'col_roots': [],
@@ -2243,7 +2244,84 @@ def initialise():
     collection_ref.document('prev_states').set({'0': state })
     db.collection('mutex_lock').document('lock').set({'is_lock_held': 0, 'process_name': ''})
 
-initialise()
+#initialise()
+# start an instance and execute the code without writing
+def test():
+    me = db.collection('pending_transactions').stream()
+    code = []
+    ops = CommonOps()
+    for doc in me:
+        if doc.id == 'cleared':
+            continue
+        doc_val = doc.to_dict()
+        if 'weirdName' in doc_val:
+            continue
+ 
+        if doc_val['values']['category'] == EVENTC[SELL]:
+            print('sale')
+            code.append(ops.create_sales_instructions(values={
+                'tray_no': doc_val['values']['trayNo'],
+                'tray_price': doc_val['values']['trayPrice'],
+                'amount': int(doc_val['values']['trayNo']) * float(doc_val['values']['trayPrice']),
+                'section': doc_val['values']['section'],
+                'by': doc_val['values']['name'],
+                'date': doc_val['values']['date'].timestamp(),
+                'buyer': doc_val['values']['buyerName'],
+                'submitted_on': doc_val['submittedOn'].timestamp()
+            }))
+        elif doc_val['values']['category'] == EVENTC[TRADE]:
+            print('trade')
+            code.append(ops.create_trade_instructions(values={
+                'to': 'PURITY',
+                'from': 'BLACK_HOLE',
+                'amount': 3000,
+                'by': 'PURITY',
+                'date': 1654523316,
+                'reason': '',
+                'submitted_on': 1654523316
+            }))
+        elif doc_val['values']['category'] == EVENTC[BUY]:
+            print('buy')
+            code.append(ops.create_purchases_instructions(values={
+                'item_no': 5,
+                'item_price': 280,
+                'amount': 5*280,
+                'section': 'FEEDS',
+                'by': 'PURITY',
+                'date': 1654523316,
+                'item_name': 'LAYERS',
+                'submitted_on': 1654523316
+            }))
+        elif doc_val['values']['category'] == EVENTC[DS]:
+            print('dead')
+            code.append(ops.create_ds_instructions(values={
+                'image_url': 'https://firebasestorage.googleapis.com/v0/b/poultry101-6b1ed.appspot.com/o/dead_sick%2FIMG-20210804-WA0000.jpg?alt=media&token=24a1416a-8ec4-4ae9-b12b-21425917ed0d',
+                'image_id': 'hello.jpg',
+                'reason': 'DISEASE',
+                'number': 2,
+                'by': 'PURITY',
+                'date': 1654523316,
+                'section': 'DEAD',
+                'location': 'CAGE',
+                'submitted_on': 1654523316
+            }))
+        elif doc_val['values']['category'] == EVENTC[EGGS]:
+            code.append(ops.create_eggs_collected_instructions(values={
+                'a1': 5,
+                'a2': 5,
+                'b1': 5,
+                'b2': 5,
+                'c1': 5,
+                'c2': 5,
+                'house': 5,
+                'broken': 5,
+                'trays_collected': '3,5',
+                'by': 'PURITY',
+                'date': 1654523316,
+                'submitted_on': 1654523316
+            }))
+
+test()
 
 inst_mapping = {
     str(Opcodes.PUSH.value): push,
