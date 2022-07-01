@@ -2243,7 +2243,7 @@ def initialise():
     collection_ref.document('prev_states').set({'0': state })
     db.collection('mutex_lock').document('lock').set({'is_lock_held': 0, 'process_name': ''})
 
-#initialise()
+initialise()
 
 inst_mapping = {
     str(Opcodes.PUSH.value): push,
