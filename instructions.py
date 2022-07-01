@@ -25,7 +25,7 @@ TWOPLACES = Decimal(10) ** -2
 other = 'other'
 starting_birds_no = Decimal(500)
 
-cred = credentials.Certificate("core101-3afde-firebase-adminsdk-sxm20-194a475b51.json")
+cred = credentials.Certificate("poultry101-6b1ed-firebase-adminsdk-4h0rk-4b8268dd31.json")
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
@@ -1697,7 +1697,8 @@ def update_dashboard_data(stack=None, memory=None, pc=None, analysed=None):
         'VICTOR': cache_state['trades']['state']['balances']['VICTOR'],
         'JEFF': cache_state['trades']['state']['balances']['JEFF'],
         'PURITY': cache_state['trades']['state']['balances']['PURITY'],
-        'BABRA': cache_state['trades']['state']['balances']['BABRA']
+        'BABRA': cache_state['trades']['state']['balances']['BABRA'],
+        'THIKAFARMERSDEBT': cache_state['trades']['state']['balances']['FEEDS'] - cache_state['trades']['state']['balances']['THIKAFARMERS']
     }
 
     def get_laying_change_percent(period):
