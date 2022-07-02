@@ -3,6 +3,7 @@ from decimal import *
 getcontext().traps[FloatOperation] = True
 TWOPLACES = Decimal(10) ** -2
 
+MAX_CHAR_COUNT_LOG = 90
 other = 'other'
 eggs_in_tray = Decimal(30)
 starting_birds_no = Decimal(500)

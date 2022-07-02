@@ -247,9 +247,9 @@ def create_instr(name):
             if first and name == 'eggs_collected':
                 first = False
             elif name != 'eggs_collected':
-                temp = temp[15:]
+                temp = temp[18:]
             elif name == 'eggs_collected':
-                temp = temp[12:]
+                temp = temp[15:]
                 
             if name == 'eggs_collected':
                 last_instr = list(temp[-19:])

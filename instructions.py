@@ -323,7 +323,9 @@ def sha256(stack=None, memory=None, pc=None, analysed=None):
         val = stack.pop()
         to_hash += str(val)
     
-    log.debug(f"all hashes: {to_hash}")
+    message = f"all hashes: {to_hash}"
+    message = message[:MAX_CHAR_COUNT_LOG]+"..." if len(message) > MAX_CHAR_COUNT_LOG else message
+    log.debug(message)
     m.update(to_hash.encode())
     stack.push(m.hexdigest())
 
@@ -788,7 +790,9 @@ def create_entry(stack=None, memory=None, pc=None, analysed=None):
         del cache_state[EVENTC[TRADE]]['temp']
 
     if not is_replaced:
-        log.info(f'Entry added, collection: {EVENTC[entry_name]}, {cache_state[EVENTC[entry_name]][entry_hash]}')
+        message = f'Entry added, collection: {EVENTC[entry_name]}, {cache_state[EVENTC[entry_name]][entry_hash]}'
+        message = message[:MAX_CHAR_COUNT_LOG]+"..." if len(message) > MAX_CHAR_COUNT_LOG else message
+        log.info(message)
         memory['TOTALCREATES'] += 1
         if EVENTC[entry_name] in memory['ADDED']:
             memory['ADDED'][EVENTC[entry_name]] += 1
@@ -853,9 +857,13 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
     month_in_seconds = 28 * 24 * 60 * 60
     month_in_seconds = Decimal(month_in_seconds)
 
-    log.debug(f"cache after prev_state update but before sort: {cache_state[collection_name]}")
+    message = f"cache after prev_state update but before sort: {cache_state[collection_name]}"
+    message = message[:MAX_CHAR_COUNT_LOG]+"..." if len(message) > MAX_CHAR_COUNT_LOG else message
+    log.debug(message)
     sorted_tuples = sorted(cache_state[collection_name].items(), key=lambda item: item[1]['date']['unix'] if 'date' in item[1] and 'unix' in item[1]['date'] else Decimal(0))
-    log.debug(f"cache after prev_state update after sort: {sorted_tuples}")
+    message = f"cache after prev_state update after sort: {sorted_tuples}"
+    message = message[:MAX_CHAR_COUNT_LOG]+"..." if len(message) > MAX_CHAR_COUNT_LOG else message
+    log.debug(message)
     cache_state[collection_name] = {k: v for k, v in sorted_tuples}
 
     is_first = True
@@ -1475,11 +1483,15 @@ def update_root_hash(stack=None, memory=None, pc=None, analysed=None):
     if collection_name != 'main':
         cache_state[collection_name]['state']['root_hash'] = hash
         cache_state['world_state']['main']['col_roots'].append(hash)
-        log.debug(f"New state: {cache_state[collection_name]['state']}")
+        message = f"New state: {cache_state[collection_name]['state']}"
+        message = message[:MAX_CHAR_COUNT_LOG]+"..." if len(message) > MAX_CHAR_COUNT_LOG else message
+        log.debug(message)
         return stack, memory, pc, cache_state, cache_accounts
     else:
         cache_state['world_state']['main']['root'] = hash
-        log.debug(f"New main state: {cache_state['world_state']['main']}")
+        message = f"New main state: {cache_state['world_state']['main']}"
+        message = message[:MAX_CHAR_COUNT_LOG]+"..." if len(message) > MAX_CHAR_COUNT_LOG else message
+        log.debug(message)
         return stack, memory, pc, cache_state, cache_accounts
 
 
@@ -2245,83 +2257,336 @@ def initialise():
     db.collection('mutex_lock').document('lock').set({'is_lock_held': 0, 'process_name': ''})
 
 #initialise()
-# start an instance and execute the code without writing
+
+# on create, cloud function, gets all in ascending creates code
+# removes last and first, executes without write
 def test():
-    me = db.collection('pending_transactions').stream()
+    collection_ref = db.collection('pending_transactions')
+    query = collection_ref.order_by('values.date', direction=firestore.Query.ASCENDING)
+    eggs_docs = db.collection('pend_eggs_collected').stream()
+    results = query.stream()
     code = []
     ops = CommonOps()
-    for doc in me:
+    first = True
+    last_instr = []
+    for doc in results:
         if doc.id == 'cleared':
             continue
         doc_val = doc.to_dict()
         if 'weirdName' in doc_val:
             continue
- 
-        if doc_val['values']['category'] == EVENTC[SELL]:
-            print('sale')
-            code.append(ops.create_sales_instructions(values={
-                'tray_no': doc_val['values']['trayNo'],
-                'tray_price': doc_val['values']['trayPrice'],
-                'amount': int(doc_val['values']['trayNo']) * float(doc_val['values']['trayPrice']),
-                'section': doc_val['values']['section'],
-                'by': doc_val['values']['name'],
-                'date': doc_val['values']['date'].timestamp(),
-                'buyer': doc_val['values']['buyerName'],
-                'submitted_on': doc_val['submittedOn'].timestamp()
-            }))
-        elif doc_val['values']['category'] == EVENTC[TRADE]:
-            print('trade')
-            code.append(ops.create_trade_instructions(values={
-                'to': 'PURITY',
-                'from': 'BLACK_HOLE',
-                'amount': 3000,
-                'by': 'PURITY',
-                'date': 1654523316,
-                'reason': '',
-                'submitted_on': 1654523316
-            }))
-        elif doc_val['values']['category'] == EVENTC[BUY]:
-            print('buy')
-            code.append(ops.create_purchases_instructions(values={
-                'item_no': 5,
-                'item_price': 280,
-                'amount': 5*280,
-                'section': 'FEEDS',
-                'by': 'PURITY',
-                'date': 1654523316,
-                'item_name': 'LAYERS',
-                'submitted_on': 1654523316
-            }))
-        elif doc_val['values']['category'] == EVENTC[DS]:
-            print('dead')
-            code.append(ops.create_ds_instructions(values={
-                'image_url': 'https://firebasestorage.googleapis.com/v0/b/poultry101-6b1ed.appspot.com/o/dead_sick%2FIMG-20210804-WA0000.jpg?alt=media&token=24a1416a-8ec4-4ae9-b12b-21425917ed0d',
-                'image_id': 'hello.jpg',
-                'reason': 'DISEASE',
-                'number': 2,
-                'by': 'PURITY',
-                'date': 1654523316,
-                'section': 'DEAD',
-                'location': 'CAGE',
-                'submitted_on': 1654523316
-            }))
-        elif doc_val['values']['category'] == EVENTC[EGGS]:
-            code.append(ops.create_eggs_collected_instructions(values={
-                'a1': 5,
-                'a2': 5,
-                'b1': 5,
-                'b2': 5,
-                'c1': 5,
-                'c2': 5,
-                'house': 5,
-                'broken': 5,
-                'trays_collected': '3,5',
-                'by': 'PURITY',
-                'date': 1654523316,
-                'submitted_on': 1654523316
-            }))
 
-test()
+        map_nested_dicts_modify(doc_val, lambda x: float(x) if re.search("^[+-]?([0-9]*[.])?[0-9]+$", str(x)) else x)
+        map_nested_dicts_modify(doc_val, lambda x: x.upper() if isinstance(x, str) else x)
+
+        if doc_val['values']['category'].lower() == EVENTC[SELL]:
+            if first:
+                code.append(ops.create_sales_instructions(values={
+                    'tray_no': doc_val['values']['trayNo'],
+                    'tray_price': doc_val['values']['trayPrice'],
+                    'amount': doc_val['values']['trayNo'] * doc_val['values']['trayPrice'],
+                    'section': doc_val['values']['section'],
+                    'by': doc_val['values']['name'],
+                    'date': doc_val['values']['date'].timestamp(),
+                    'buyer': doc_val['values']['buyerName'],
+                    'submitted_on': doc_val['submittedOn'].timestamp()
+                }))
+                first = False
+            else:
+                temp_code = ops.create_sales_instructions(values={
+                    'tray_no': doc_val['values']['trayNo'],
+                    'tray_price': doc_val['values']['trayPrice'],
+                    'amount': doc_val['values']['trayNo'] * doc_val['values']['trayPrice'],
+                    'section': doc_val['values']['section'],
+                    'by': doc_val['values']['name'],
+                    'date': doc_val['values']['date'].timestamp(),
+                    'buyer': doc_val['values']['buyerName'],
+                    'submitted_on': doc_val['submittedOn'].timestamp()
+                })
+                temp_code = temp_code[18:]
+                if not last_instr:
+                    last_instr = list(temp_code[-31:])
+                temp_code = temp_code[:-31]
+
+                code.append(temp_code)
+                jumpif = 0
+                k = 0
+                for _ in temp_code:
+                    if k >= len(temp_code):
+                        break
+                    if temp_code[k] == Opcodes.JUMPIF.value:
+                        jumpif += 1
+                    elif temp_code[k] == Opcodes.JUMPDEST.value:
+                        jumpif -= 1
+
+                    if temp_code[k] == Opcodes.PUSH.value:
+                        k += 2
+                    else:
+                        k += 1
+
+                if jumpif != 0:
+                    print("final", jumpif)
+                    raise RuntimeError("Invalid number of jumpif and jumpdest")
+            
+        elif doc_val['values']['category'].lower() == 'send':
+            if first:
+                code.append(ops.create_trade_instructions(values={
+                    'to': doc_val['values']['receiver'],
+                    'from': doc_val['values']['initiator'],
+                    'amount': doc_val['values']['amount'],
+                    'by': doc_val['values']['name'],
+                    'date': doc_val['submittedOn'].timestamp(),
+                    'reason': '',
+                    'submitted_on': doc_val['submittedOn'].timestamp()
+                }))
+                first = False
+            else:
+                temp_code = ops.create_trade_instructions(values={
+                    'to': doc_val['values']['receiver'],
+                    'from': doc_val['values']['initiator'],
+                    'amount': doc_val['values']['amount'],
+                    'by': doc_val['values']['name'],
+                    'date': doc_val['submittedOn'].timestamp(),
+                    'reason': '',
+                    'submitted_on': doc_val['submittedOn'].timestamp()
+                })
+                temp_code = temp_code[18:]
+                if not last_instr:
+                    last_instr = list(temp_code[-31:])
+                temp_code = temp_code[:-31]
+
+                code.append(temp_code)
+                jumpif = 0
+                k = 0
+                for _ in temp_code:
+                    if k >= len(temp_code):
+                        break
+                    if temp_code[k] == Opcodes.JUMPIF.value:
+                        jumpif += 1
+                    elif temp_code[k] == Opcodes.JUMPDEST.value:
+                        jumpif -= 1
+
+                    if temp_code[k] == Opcodes.PUSH.value:
+                        k += 2
+                    else:
+                        k += 1
+
+                if jumpif != 0:
+                    print("final", jumpif)
+                    raise RuntimeError("Invalid number of jumpif and jumpdest")
+
+        elif doc_val['values']['category'].lower() == 'borrow':
+            if first:
+                code.append(ops.create_trade_instructions(values={
+                    'to': doc_val['values']['get_from'],
+                    'from': doc_val['values']['borrower'],
+                    'amount': float(doc_val['values']['amount']),
+                    'by': doc_val['values']['name'],
+                    'date': doc_val['values']['date'].timestamp(),
+                    'reason': doc_val['values']['purpose'],
+                    'submitted_on': doc_val['submittedOn'].timestamp()
+                }))
+                first = False
+            else:
+                temp_code = ops.create_trade_instructions(values={
+                    'to': doc_val['values']['get_from'],
+                    'from': doc_val['values']['borrower'],
+                    'amount': float(doc_val['values']['amount']),
+                    'by': doc_val['values']['name'],
+                    'date': doc_val['values']['date'].timestamp(),
+                    'reason': doc_val['values']['purpose'],
+                    'submitted_on': doc_val['submittedOn'].timestamp()
+                })
+                temp_code = temp_code[18:]
+                if not last_instr:
+                    last_instr = list(temp_code[-31:])
+                temp_code = temp_code[:-31]
+
+                code.append(temp_code)
+                jumpif = 0
+                k = 0
+                for _ in temp_code:
+                    if k >= len(temp_code):
+                        break
+                    if temp_code[k] == Opcodes.JUMPIF.value:
+                        jumpif += 1
+                    elif temp_code[k] == Opcodes.JUMPDEST.value:
+                        jumpif -= 1
+
+                    if temp_code[k] == Opcodes.PUSH.value:
+                        k += 2
+                    else:
+                        k += 1
+
+                if jumpif != 0:
+                    print("final", jumpif)
+                    raise RuntimeError("Invalid number of jumpif and jumpdest")
+
+        elif doc_val['values']['category'].lower() == 'buys':
+            if first:
+                code.append(ops.create_purchases_instructions(values={
+                    'item_no': doc_val['values']['objectNo'],
+                    'item_price': doc_val['values']['objectPrice'],
+                    'amount': doc_val['values']['objectPrice'] * doc_val['values']['objectNo'],
+                    'section': doc_val['values']['section'],
+                    'by': doc_val['values']['name'],
+                    'date': doc_val['values']['date'],
+                    'item_name': doc_val['values']['itemName'],
+                    'submitted_on': doc_val['submittedOn'].timestamp()
+                }))
+                first = False
+            else:
+                temp_code = ops.create_purchases_instructions(values={
+                    'item_no': doc_val['values']['objectNo'],
+                    'item_price': doc_val['values']['objectPrice'],
+                    'amount': doc_val['values']['objectPrice'] * doc_val['values']['objectNo'],
+                    'section': doc_val['values']['section'],
+                    'by': doc_val['values']['name'],
+                    'date': doc_val['values']['date'],
+                    'item_name': doc_val['values']['itemName'],
+                    'submitted_on': doc_val['submittedOn'].timestamp()
+                })
+                temp_code = temp_code[18:]
+                if not last_instr:
+                    last_instr = list(temp_code[-31:])
+                temp_code = temp_code[:-31]
+
+                code.append(temp_code)
+                jumpif = 0
+                k = 0
+                for _ in temp_code:
+                    if k >= len(temp_code):
+                        break
+                    if temp_code[k] == Opcodes.JUMPIF.value:
+                        jumpif += 1
+                    elif temp_code[k] == Opcodes.JUMPDEST.value:
+                        jumpif -= 1
+
+                    if temp_code[k] == Opcodes.PUSH.value:
+                        k += 2
+                    else:
+                        k += 1
+
+                if jumpif != 0:
+                    print("final", jumpif)
+                    raise RuntimeError("Invalid number of jumpif and jumpdest")
+            
+        elif doc_val['values']['category'].lower() == 'deadsick':
+            if first:
+                code.append(ops.create_ds_instructions(values={
+                    'image_url': doc_val['values']['url'],
+                    'image_id': doc_val['file_name'],
+                    'reason': doc_val['values']['reason'],
+                    'number': doc_val['values']['chickenNo'],
+                    'by': doc_val['values']['submittedBy'],
+                    'date': doc_val['values']['date'],
+                    'section': doc_val['values']['section'],
+                    'location': doc_val['values']['place'],
+                    'submitted_on': doc_val['submittedOn'].timestamp()
+                }))
+                first = False
+            else:
+                temp_code = ops.create_ds_instructions(values={
+                    'image_url': doc_val['values']['url'],
+                    'image_id': doc_val['file_name'],
+                    'reason': doc_val['values']['reason'],
+                    'number': doc_val['values']['chickenNo'],
+                    'by': doc_val['values']['submittedBy'],
+                    'date': doc_val['values']['date'],
+                    'section': doc_val['values']['section'],
+                    'location': doc_val['values']['place'],
+                    'submitted_on': doc_val['submittedOn'].timestamp()
+                })
+                temp_code = temp_code[18:]
+                if not last_instr:
+                    last_instr = list(temp_code[-31:])
+                temp_code = temp_code[:-31]
+
+                code.append(temp_code)
+                jumpif = 0
+                k = 0
+                for _ in temp_code:
+                    if k >= len(temp_code):
+                        break
+                    if temp_code[k] == Opcodes.JUMPIF.value:
+                        jumpif += 1
+                    elif temp_code[k] == Opcodes.JUMPDEST.value:
+                        jumpif -= 1
+
+                    if temp_code[k] == Opcodes.PUSH.value:
+                        k += 2
+                    else:
+                        k += 1
+
+                if jumpif != 0:
+                    print("final", jumpif)
+                    raise RuntimeError("Invalid number of jumpif and jumpdest")
+    
+    for doc in eggs_docs:
+        doc_val = doc.to_dict()
+        map_nested_dicts_modify(doc_val, lambda x: float(x) if re.search("^[+-]?([0-9]*[.])?[0-9]+$", str(x)) else x)
+        map_nested_dicts_modify(doc_val, lambda x: x.upper() if isinstance(x, str) else x)
+
+        if first:
+            code.append(ops.create_eggs_collected_instructions(values={
+                'a1': doc_val['a1'],
+                'a2': doc_val['a2'],
+                'b1': doc_val['b1'],
+                'b2': doc_val['b2'],
+                'c1': doc_val['c1'],
+                'c2': doc_val['c2'],
+                'house': doc_val['house'],
+                'broken': doc_val['broken'],
+                'trays_collected': doc_val['trays_store'],
+                'by': doc_val['submittedBy'],
+                'date': doc_val['date_'] / 1000, # in milliseconds
+                'submitted_on': doc_val['submittedOn'].timestamp(),
+            }))
+            first = False
+        else:
+            temp_code = ops.create_eggs_collected_instructions(values={
+                'a1': doc_val['a1'],
+                'a2': doc_val['a2'],
+                'b1': doc_val['b1'],
+                'b2': doc_val['b2'],
+                'c1': doc_val['c1'],
+                'c2': doc_val['c2'],
+                'house': doc_val['house'],
+                'broken': doc_val['broken'],
+                'trays_collected': doc_val['trays_store'],
+                'by': doc_val['submittedBy'],
+                'date': doc_val['date_'] / 1000, # in milliseconds
+                'submitted_on': doc_val['submittedOn'].timestamp(),
+            })
+            temp_code = temp_code[18:]
+            if not last_instr:
+                last_instr = list(temp_code[-19:])
+            temp_code = temp_code[:-19]
+
+            code.append(temp_code)
+            jumpif = 0
+            k = 0
+            for _ in temp_code:
+                if k >= len(temp_code):
+                    break
+                if temp_code[k] == Opcodes.JUMPIF.value:
+                    jumpif += 1
+                elif temp_code[k] == Opcodes.JUMPDEST.value:
+                    jumpif -= 1
+
+                if temp_code[k] == Opcodes.PUSH.value:
+                    k += 2
+                else:
+                    k += 1
+
+            if jumpif != 0:
+                print("final", jumpif)
+                raise RuntimeError("Invalid number of jumpif and jumpdest")
+
+    code.append(last_instr)
+    code = [x for xs in code for x in xs] # flatten the list
+    return code
+
 
 inst_mapping = {
     str(Opcodes.PUSH.value): push,

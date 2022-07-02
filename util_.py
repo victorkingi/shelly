@@ -5,7 +5,7 @@ import random
 from decimal import *
 from functools import reduce
 from log_ import log
-from constants import CREATE, DELETE, starting_birds_no, eggs_in_tray
+from constants import *
 import collections.abc
 
 getcontext().traps[FloatOperation] = True
@@ -64,7 +64,9 @@ def get_true_hash_for_tx(tx, collection_name):
         log.error("Invalid collection name provided to true hash function")
         return None
     
-    log.debug(f"tx data to hash, {tx_data_to_hash}")
+    message = f"tx data to hash, {tx_data_to_hash}"
+    message = message[:MAX_CHAR_COUNT_LOG]+"..."  if len(message) > MAX_CHAR_COUNT_LOG else message
+    log.debug(message)
 
     def internal_hash(to_hash):
         m = hashlib.sha256()
