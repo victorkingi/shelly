@@ -874,6 +874,7 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
     if collection_name == EVENTC[TRADE]:
         cache_state[collection_name]['state']['balances'] = {}
         for user in cache_accounts:
+            tot = 0
             if user == 'BLACK_HOLE':
                 cache_state[collection_name]['state']['balances'][user] = Decimal(MAX_EMAX)
                 continue
@@ -889,9 +890,13 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
                 tx = cache_state[collection_name][id]
                 if tx['to'] == user:
                     cache_state[collection_name]['state']['balances'][user] += Decimal(str(tx['amount']))
+                    tot += Decimal(str(tx['amount']))
                         
                 elif tx['from'] == user:
                     cache_state[collection_name]['state']['balances'][user] -= Decimal(str(tx['amount']))
+                    tot -= Decimal(str(tx['amount']))
+            
+            print(tot, user)
             
             if cache_state[collection_name]['state']['balances'][user] != cache_accounts[user]:
                 log.error(f"balances do not match for address {user}, state: {cache_state[collection_name]['state']['balances'][user]}, acc: {cache_accounts[user]}")
