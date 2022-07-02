@@ -40,7 +40,7 @@ if __name__ == '__main__':
                 res, acc, state = None, None, None
 
                 while signal == -2: 
-                    vm_ = VM(create_instr('eggs_collected')+create_instr('sales')+create_instr('purchases')+create_instr('trade')+create_instr('ds')+[0, 'dead_sick', 0, 1, 1, 0, 1, 1, 24, 25, 14, 26]+end[:-1]+[37, 38, 39, 40, 31])
+                    vm_ = VM(create_instr('eggs_collected')+create_instr('sales')+create_instr('purchases')+create_instr('trade')+create_instr('ds')+[0, 'dead_sick', 0, 1, 1, 0, 1, 1, 24, 25, 14, 26]+end[:-1]+[37, 38, 39, 31])
                     #cops = CommonOps()
                     #vm_ = VM(flattened_code)
                     # 1647291600 1640034000

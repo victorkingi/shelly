@@ -827,21 +827,21 @@ def delete_entry(stack=None, memory=None, pc=None, analysed=None):
     locale = dt1.strftime("%m/%d/%Y, %H:%M:%S")
 
     cache_deleted[tx_hash] = {
-        collection: collection_name,
-        entry: cache_state[collection_name][tx_hash],
-        submitted_on: {'unix': Decimal(time.time()), 'locale': locale+', Africa/Nairobi'},
-        by: memory.get('user', 'null')
+        'collection': collection_name,
+        'entry': cache_state[collection_name][tx_hash],
+        'submitted_on': {'unix': Decimal(time.time()), 'locale': locale+', Africa/Nairobi'},
+        'by': memory.get('user', 'null')
     }
     del cache_state[collection_name][tx_hash]
     
     log.info(f"entry deleted in collection {collection_name}, id: {tx_hash}")
     memory['TOTALDELETES'] += 1
 
-    if EVENTC[entry_name] in memory['DELETES']:
-        memory['DELETES'][EVENTC[entry_name]]['num'] += 1
-        memory['DELETES'][EVENTC[entry_name]]['hashes'].append(tx_hash)
+    if collection_name in memory['DELETES']:
+        memory['DELETES'][collection_name]['num'] += 1
+        memory['DELETES'][collection_name]['hashes'].append(tx_hash)
     else:
-        memory['DELETES'][EVENTC[entry_name]] = {'num': 1, 'hashes': [tx_hash]}
+        memory['DELETES'][collection_name] = {'num': 1, 'hashes': [tx_hash]}
 
     return stack, memory, pc, cache_state, cache_accounts
 
@@ -874,7 +874,6 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
     if collection_name == EVENTC[TRADE]:
         cache_state[collection_name]['state']['balances'] = {}
         for user in cache_accounts:
-            tot = 0
             if user == 'BLACK_HOLE':
                 cache_state[collection_name]['state']['balances'][user] = Decimal(MAX_EMAX)
                 continue
@@ -890,13 +889,9 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
                 tx = cache_state[collection_name][id]
                 if tx['to'] == user:
                     cache_state[collection_name]['state']['balances'][user] += Decimal(str(tx['amount']))
-                    tot += Decimal(str(tx['amount']))
                         
                 elif tx['from'] == user:
                     cache_state[collection_name]['state']['balances'][user] -= Decimal(str(tx['amount']))
-                    tot -= Decimal(str(tx['amount']))
-            
-            print(tot, user)
             
             if cache_state[collection_name]['state']['balances'][user] != cache_accounts[user]:
                 log.error(f"balances do not match for address {user}, state: {cache_state[collection_name]['state']['balances'][user]}, acc: {cache_accounts[user]}")
@@ -2179,7 +2174,7 @@ def initialise():
             state['total_purchases'] = 0
             state['total_spent'] = 0
             state['total_items_bought'] = 0
-            sections = ['feeds', 'drugs', 'other', 'purity']
+            sections = ['feeds', 'drugs', 'other', 'purity', 'ppurity']
             for sec in sections:
                 state[f'total_spent_{sec}'] = 0
                 state[f'total_items_bought_{sec}'] = 0
@@ -2192,10 +2187,12 @@ def initialise():
                 f'spent_{sections[1]}': 0,
                 f'spent_{sections[2]}': 0,
                 f'spent_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                f'spent_{sections[4]}': 0,
                 f'items_bought_{sections[0]}': 0,
                 f'items_bought_{sections[1]}': 0,
                 f'items_bought_{sections[2]}': 0,
                 f'items_bought_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                f'items_bought_{sections[4]}': 0
                 }
             }
             state['month_items_bought_spent'] = {'1656968400': {
@@ -2205,10 +2202,12 @@ def initialise():
                 f'spent_{sections[1]}': 0,
                 f'spent_{sections[2]}': 0,
                 f'spent_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                f'spent_{sections[4]}': 0,
                 f'items_bought_{sections[0]}': 0,
                 f'items_bought_{sections[1]}': 0,
                 f'items_bought_{sections[2]}': 0,
                 f'items_bought_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                f'items_bought_{sections[4]}': 0
                 }
             }
             state['change_week'] = {'1652734800': {
@@ -2218,10 +2217,12 @@ def initialise():
                 f'change_spent_{sections[1]}': 0,
                 f'change_spent_{sections[2]}': 0,
                 f'change_spent_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                f'change_spent_{sections[4]}': 0,
                 f'change_items_bought_{sections[0]}': 0,
                 f'change_items_bought_{sections[1]}': 0,
                 f'change_items_bought_{sections[2]}': 0,
-                f'change_items_bought_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                f'change_items_bought_{sections[3]}': 0, # earned_other_buyer_name added 
+                f'change_items_bought_{sections[4]}': 0
                 }
             }
             state['change_month'] = {'1656968400': {
@@ -2231,10 +2232,12 @@ def initialise():
                 f'change_spent_{sections[1]}': 0,
                 f'change_spent_{sections[2]}': 0,
                 f'change_spent_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                f'change_spent_{sections[4]}': 0,
                 f'change_items_bought_{sections[0]}': 0,
                 f'change_items_bought_{sections[1]}': 0,
                 f'change_items_bought_{sections[2]}': 0,
                 f'change_items_bought_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                f'change_items_bought_{sections[4]}': 0
                 }
             }
 
