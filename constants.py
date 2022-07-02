@@ -38,7 +38,7 @@ EVENTC = {SELL: 'sales', TRADE: 'trades', BUY: 'purchases', DS: 'dead_sick', EGG
 
 # sections
 VALID_SELL_SECTIONS = set(('CAKES', 'DUKA', 'THIKAFARMERS', 'SOTHER'))
-VALID_BUY_SECTIONS = set(('PURITY', 'FEEDS', 'DRUGS', 'POTHER'))
+VALID_BUY_SECTIONS = set(('PPURITY', 'FEEDS', 'DRUGS', 'POTHER'))
 
 # valid buyers
 buyers = set((

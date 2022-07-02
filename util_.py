@@ -66,7 +66,7 @@ def get_true_hash_for_tx(tx, collection_name):
     
     message = f"tx data to hash, {tx_data_to_hash}"
     message = message[:MAX_CHAR_COUNT_LOG]+"..."  if len(message) > MAX_CHAR_COUNT_LOG else message
-    log.debug(message)
+    #log.debug(message)
 
     def internal_hash(to_hash):
         m = hashlib.sha256()

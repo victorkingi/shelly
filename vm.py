@@ -490,6 +490,7 @@ class VM:
             message = message[:MAX_CHAR_COUNT_LOG]+"..."  if len(message) > MAX_CHAR_COUNT_LOG else message
             log.debug(message)
             val = self.code[self.pc]
+
             if not self.is_instr_safe(val, elem=self.code[self.pc+1] if self.pc+1 < len(self.code) and val == Opcodes.PUSH.value else None):
                 res = [name for name, member in Opcodes.__members__.items() if member.value == val]
                 log.error(f"Instruction provided not safe, {val}: {res[0] if len(res) > 0 else res}")

@@ -1187,7 +1187,7 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
             if percent_exact is None or percent_trays_collected is None:
                 return None, None, None, None, None
 
-            state['trays_collected_to_timestamp'][str(tx['date']['unix'])] = {
+            state['trays_collected_to_timestamp'][str(tx['date']['unix']) if str(tx['date']['unix']).isnumeric() else str(int(tx['date']['unix']))] = {
                 'trays_collected': tx['trays_collected'],
                 'exact': get_eggs(amount)[0],
                 'percent_exact': percent_exact,
@@ -1323,7 +1323,17 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
             'exact': Decimal(0),
             'given': Decimal(0)
         }
+        last = 0
+        s = True
         for x in cache_state[EVENTC[EGGS]]['state']['trays_collected_to_timestamp']:
+            if s:
+                s = False
+                last = int(x)
+            else:
+                if int(x)-(24*60*60) != last:
+                    log.error(f"Mismatch of trays collected dates, got {x} but expected {int(x)-(24*60*60)}")
+                    return None, None, None, None, None
+            last = int(x)
             if i_w == 7 and i_m == 28:
                 cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_exact'] = aggregate_week_percent['exact'] / Decimal(7)
                 cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_given'] = aggregate_week_percent['given'] / Decimal(7)
@@ -2269,6 +2279,8 @@ def test():
     ops = CommonOps()
     first = True
     last_instr = []
+    i = 0
+    '''
     for doc in results:
         if doc.id == 'cleared':
             continue
@@ -2280,8 +2292,13 @@ def test():
         map_nested_dicts_modify(doc_val, lambda x: x.upper() if isinstance(x, str) else x)
 
         if doc_val['values']['category'].lower() == EVENTC[SELL]:
+            if doc_val['values']['section'] == 'THIKA_FARMERS':
+                doc_val['values']['section'] = 'THIKAFARMERS'
+            elif doc_val['values']['section'] == 'OTHER_SALE':
+                doc_val['values']['section'] = 'SOTHER'
+
             if first:
-                code.append(ops.create_sales_instructions(values={
+                temp_code = ops.create_sales_instructions(values={
                     'tray_no': doc_val['values']['trayNo'],
                     'tray_price': doc_val['values']['trayPrice'],
                     'amount': doc_val['values']['trayNo'] * doc_val['values']['trayPrice'],
@@ -2290,8 +2307,30 @@ def test():
                     'date': doc_val['values']['date'].timestamp(),
                     'buyer': doc_val['values']['buyerName'],
                     'submitted_on': doc_val['submittedOn'].timestamp()
-                }))
+                })
+                if not last_instr:
+                    last_instr = list(temp_code[-31:])
+                temp_code = list(temp_code[:-31])
                 first = False
+                code.append(temp_code)
+                jumpif = 0
+                k = 0
+                for _ in temp_code:
+                    if k >= len(temp_code):
+                        break
+                    if temp_code[k] == Opcodes.JUMPIF.value:
+                        jumpif += 1
+                    elif temp_code[k] == Opcodes.JUMPDEST.value:
+                        jumpif -= 1
+
+                    if temp_code[k] == Opcodes.PUSH.value:
+                        k += 2
+                    else:
+                        k += 1
+
+                if jumpif != 0:
+                    print("final", jumpif)
+                    raise RuntimeError("Invalid number of jumpif and jumpdest")
             else:
                 temp_code = ops.create_sales_instructions(values={
                     'tray_no': doc_val['values']['trayNo'],
@@ -2303,10 +2342,10 @@ def test():
                     'buyer': doc_val['values']['buyerName'],
                     'submitted_on': doc_val['submittedOn'].timestamp()
                 })
-                temp_code = temp_code[18:]
+                temp_code = list(temp_code[18:])
                 if not last_instr:
                     last_instr = list(temp_code[-31:])
-                temp_code = temp_code[:-31]
+                temp_code = list(temp_code[:-31])
 
                 code.append(temp_code)
                 jumpif = 0
@@ -2330,7 +2369,7 @@ def test():
             
         elif doc_val['values']['category'].lower() == 'send':
             if first:
-                code.append(ops.create_trade_instructions(values={
+                temp_code = ops.create_trade_instructions(values={
                     'to': doc_val['values']['receiver'],
                     'from': doc_val['values']['initiator'],
                     'amount': doc_val['values']['amount'],
@@ -2338,8 +2377,30 @@ def test():
                     'date': doc_val['submittedOn'].timestamp(),
                     'reason': '',
                     'submitted_on': doc_val['submittedOn'].timestamp()
-                }))
+                })
+                if not last_instr:
+                    last_instr = list(temp_code[-31:])
+                temp_code = list(temp_code[:-31])
                 first = False
+                code.append(temp_code)
+                jumpif = 0
+                k = 0
+                for _ in temp_code:
+                    if k >= len(temp_code):
+                        break
+                    if temp_code[k] == Opcodes.JUMPIF.value:
+                        jumpif += 1
+                    elif temp_code[k] == Opcodes.JUMPDEST.value:
+                        jumpif -= 1
+
+                    if temp_code[k] == Opcodes.PUSH.value:
+                        k += 2
+                    else:
+                        k += 1
+
+                if jumpif != 0:
+                    print("final", jumpif)
+                    raise RuntimeError("Invalid number of jumpif and jumpdest")
             else:
                 temp_code = ops.create_trade_instructions(values={
                     'to': doc_val['values']['receiver'],
@@ -2350,10 +2411,10 @@ def test():
                     'reason': '',
                     'submitted_on': doc_val['submittedOn'].timestamp()
                 })
-                temp_code = temp_code[18:]
+                temp_code = list(temp_code[18:])
                 if not last_instr:
                     last_instr = list(temp_code[-31:])
-                temp_code = temp_code[:-31]
+                temp_code = list(temp_code[:-31])
 
                 code.append(temp_code)
                 jumpif = 0
@@ -2377,7 +2438,7 @@ def test():
 
         elif doc_val['values']['category'].lower() == 'borrow':
             if first:
-                code.append(ops.create_trade_instructions(values={
+                temp_code = ops.create_trade_instructions(values={
                     'to': doc_val['values']['get_from'],
                     'from': doc_val['values']['borrower'],
                     'amount': float(doc_val['values']['amount']),
@@ -2385,8 +2446,31 @@ def test():
                     'date': doc_val['values']['date'].timestamp(),
                     'reason': doc_val['values']['purpose'],
                     'submitted_on': doc_val['submittedOn'].timestamp()
-                }))
+                })
+                if not last_instr:
+                    last_instr = list(temp_code[-31:])
+                temp_code = list(temp_code[:-31])
                 first = False
+                code.append(temp_code)
+                jumpif = 0
+                k = 0
+                for _ in temp_code:
+                    if k >= len(temp_code):
+                        break
+                    if temp_code[k] == Opcodes.JUMPIF.value:
+                        jumpif += 1
+                    elif temp_code[k] == Opcodes.JUMPDEST.value:
+                        jumpif -= 1
+
+                    if temp_code[k] == Opcodes.PUSH.value:
+                        k += 2
+                    else:
+                        k += 1
+
+                if jumpif != 0:
+                    print("final", jumpif)
+                    raise RuntimeError("Invalid number of jumpif and jumpdest")
+
             else:
                 temp_code = ops.create_trade_instructions(values={
                     'to': doc_val['values']['get_from'],
@@ -2397,10 +2481,10 @@ def test():
                     'reason': doc_val['values']['purpose'],
                     'submitted_on': doc_val['submittedOn'].timestamp()
                 })
-                temp_code = temp_code[18:]
+                temp_code = list(temp_code[18:])
                 if not last_instr:
                     last_instr = list(temp_code[-31:])
-                temp_code = temp_code[:-31]
+                temp_code = list(temp_code[:-31])
 
                 code.append(temp_code)
                 jumpif = 0
@@ -2423,18 +2507,47 @@ def test():
                     raise RuntimeError("Invalid number of jumpif and jumpdest")
 
         elif doc_val['values']['category'].lower() == 'buys':
+            if doc_val['values']['section'] == 'OTHER_PURITY':
+                doc_val['values']['section'] = 'PPURITY'
+            elif doc_val['values']['section'] == 'OTHER_BUY':
+                doc_val['values']['section'] = 'POTHER'
+            elif doc_val['values']['itemName'] == 'LAYERS ':
+                doc_val['values']['itemName'] = 'LAYERS'
+
             if first:
-                code.append(ops.create_purchases_instructions(values={
+                temp_code = ops.create_purchases_instructions(values={
                     'item_no': doc_val['values']['objectNo'],
                     'item_price': doc_val['values']['objectPrice'],
                     'amount': doc_val['values']['objectPrice'] * doc_val['values']['objectNo'],
                     'section': doc_val['values']['section'],
                     'by': doc_val['values']['name'],
-                    'date': doc_val['values']['date'],
+                    'date': doc_val['values']['date'].timestamp(),
                     'item_name': doc_val['values']['itemName'],
                     'submitted_on': doc_val['submittedOn'].timestamp()
-                }))
+                })
+                if not last_instr:
+                    last_instr = list(temp_code[-31:])
+                temp_code = list(temp_code[:-31])
                 first = False
+                code.append(temp_code)
+                jumpif = 0
+                k = 0
+                for _ in temp_code:
+                    if k >= len(temp_code):
+                        break
+                    if temp_code[k] == Opcodes.JUMPIF.value:
+                        jumpif += 1
+                    elif temp_code[k] == Opcodes.JUMPDEST.value:
+                        jumpif -= 1
+
+                    if temp_code[k] == Opcodes.PUSH.value:
+                        k += 2
+                    else:
+                        k += 1
+
+                if jumpif != 0:
+                    print("final", jumpif)
+                    raise RuntimeError("Invalid number of jumpif and jumpdest")
             else:
                 temp_code = ops.create_purchases_instructions(values={
                     'item_no': doc_val['values']['objectNo'],
@@ -2442,14 +2555,14 @@ def test():
                     'amount': doc_val['values']['objectPrice'] * doc_val['values']['objectNo'],
                     'section': doc_val['values']['section'],
                     'by': doc_val['values']['name'],
-                    'date': doc_val['values']['date'],
+                    'date': doc_val['values']['date'].timestamp(),
                     'item_name': doc_val['values']['itemName'],
                     'submitted_on': doc_val['submittedOn'].timestamp()
                 })
-                temp_code = temp_code[18:]
+                temp_code = list(temp_code[18:])
                 if not last_instr:
                     last_instr = list(temp_code[-31:])
-                temp_code = temp_code[:-31]
+                temp_code = list(temp_code[:-31])
 
                 code.append(temp_code)
                 jumpif = 0
@@ -2473,18 +2586,40 @@ def test():
             
         elif doc_val['values']['category'].lower() == 'deadsick':
             if first:
-                code.append(ops.create_ds_instructions(values={
+                temp_code = ops.create_ds_instructions(values={
                     'image_url': doc_val['values']['url'],
                     'image_id': doc_val['file_name'],
                     'reason': doc_val['values']['reason'],
                     'number': doc_val['values']['chickenNo'],
                     'by': doc_val['values']['submittedBy'],
-                    'date': doc_val['values']['date'],
+                    'date': doc_val['values']['date'].timestamp(),
                     'section': doc_val['values']['section'],
                     'location': doc_val['values']['place'],
                     'submitted_on': doc_val['submittedOn'].timestamp()
-                }))
+                })
+                if not last_instr:
+                    last_instr = list(temp_code[-31:])
+                temp_code = list(temp_code[:-31])
                 first = False
+                code.append(temp_code)
+                jumpif = 0
+                k = 0
+                for _ in temp_code:
+                    if k >= len(temp_code):
+                        break
+                    if temp_code[k] == Opcodes.JUMPIF.value:
+                        jumpif += 1
+                    elif temp_code[k] == Opcodes.JUMPDEST.value:
+                        jumpif -= 1
+
+                    if temp_code[k] == Opcodes.PUSH.value:
+                        k += 2
+                    else:
+                        k += 1
+
+                if jumpif != 0:
+                    print("final", jumpif)
+                    raise RuntimeError("Invalid number of jumpif and jumpdest")
             else:
                 temp_code = ops.create_ds_instructions(values={
                     'image_url': doc_val['values']['url'],
@@ -2492,15 +2627,15 @@ def test():
                     'reason': doc_val['values']['reason'],
                     'number': doc_val['values']['chickenNo'],
                     'by': doc_val['values']['submittedBy'],
-                    'date': doc_val['values']['date'],
+                    'date': doc_val['values']['date'].timestamp(),
                     'section': doc_val['values']['section'],
                     'location': doc_val['values']['place'],
                     'submitted_on': doc_val['submittedOn'].timestamp()
                 })
-                temp_code = temp_code[18:]
+                temp_code = list(temp_code[18:])
                 if not last_instr:
                     last_instr = list(temp_code[-31:])
-                temp_code = temp_code[:-31]
+                temp_code = list(temp_code[:-31])
 
                 code.append(temp_code)
                 jumpif = 0
@@ -2521,14 +2656,21 @@ def test():
                 if jumpif != 0:
                     print("final", jumpif)
                     raise RuntimeError("Invalid number of jumpif and jumpdest")
-    
+
+        else:
+            raise RuntimeError(f"Invalid category provided {doc_val['values']['category'].lower()}")
+
+        i += 1
+    '''
+    print("total", i)
+
     for doc in eggs_docs:
         doc_val = doc.to_dict()
-        map_nested_dicts_modify(doc_val, lambda x: float(x) if re.search("^[+-]?([0-9]*[.])?[0-9]+$", str(x)) else x)
+        map_nested_dicts_modify(doc_val, lambda x: float(x) if re.search("^[+-]?([0-9]*[.])?[0-9]+$", str(x)) and not str(x).isnumeric() else int(x) if str(x).isnumeric() else x)
         map_nested_dicts_modify(doc_val, lambda x: x.upper() if isinstance(x, str) else x)
 
         if first:
-            code.append(ops.create_eggs_collected_instructions(values={
+            temp_code = ops.create_eggs_collected_instructions(values={
                 'a1': doc_val['a1'],
                 'a2': doc_val['a2'],
                 'b1': doc_val['b1'],
@@ -2541,8 +2683,30 @@ def test():
                 'by': doc_val['submittedBy'],
                 'date': doc_val['date_'] / 1000, # in milliseconds
                 'submitted_on': doc_val['submittedOn'].timestamp(),
-            }))
+            })
+            if not last_instr:
+                last_instr = list(temp_code[-19:])
+            temp_code = list(temp_code[:-19])
             first = False
+            code.append(temp_code)
+            jumpif = 0
+            k = 0
+            for _ in temp_code:
+                if k >= len(temp_code):
+                    break
+                if temp_code[k] == Opcodes.JUMPIF.value:
+                    jumpif += 1
+                elif temp_code[k] == Opcodes.JUMPDEST.value:
+                    jumpif -= 1
+
+                if temp_code[k] == Opcodes.PUSH.value:
+                    k += 2
+                else:
+                    k += 1
+
+            if jumpif != 0:
+                print("final", jumpif)
+                raise RuntimeError("Invalid number of jumpif and jumpdest")
         else:
             temp_code = ops.create_eggs_collected_instructions(values={
                 'a1': doc_val['a1'],
@@ -2558,10 +2722,10 @@ def test():
                 'date': doc_val['date_'] / 1000, # in milliseconds
                 'submitted_on': doc_val['submittedOn'].timestamp(),
             })
-            temp_code = temp_code[18:]
+            temp_code = list(temp_code[18:])
             if not last_instr:
                 last_instr = list(temp_code[-19:])
-            temp_code = temp_code[:-19]
+            temp_code = list(temp_code[:-19])
 
             code.append(temp_code)
             jumpif = 0
@@ -2582,9 +2746,12 @@ def test():
             if jumpif != 0:
                 print("final", jumpif)
                 raise RuntimeError("Invalid number of jumpif and jumpdest")
+        
+        i += 1
 
-    code.append(last_instr)
+    #code.append(last_instr)
     code = [x for xs in code for x in xs] # flatten the list
+    print("total entries", i)
     return code
 
 

@@ -296,6 +296,8 @@ class CommonOps:
             [Opcodes.PUSH.value, 'world_state'],
             [Opcodes.PUSH.value, 'eggs_collected'],
             [Opcodes.PUSH.value, 'dead_sick'],
+            [Opcodes.PUSH.value, 'trades'],
+            [Opcodes.UPDATECACHE.value],
             [Opcodes.UPDATECACHE.value],
             [Opcodes.UPDATECACHE.value],
             [Opcodes.UPDATECACHE.value],

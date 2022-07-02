@@ -63,4 +63,4 @@ class Opcodes(AutoName):
     DASHBOARD = auto()
     WRITE = auto()
 
-#print(Opcodes.WRITE.value)
+print(Opcodes.CENTRY.value)
