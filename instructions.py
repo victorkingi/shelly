@@ -879,7 +879,7 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
                 continue
             elif user == 'ANNE':
                 cache_state[collection_name]['state']['balances'][user] = Decimal(4000)
-            else:    
+            else:
                 cache_state[collection_name]['state']['balances'][user] = Decimal(0) # initialise all
 
             for id in cache_state[collection_name]:
@@ -887,7 +887,6 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
                     continue
             
                 tx = cache_state[collection_name][id]
-
                 if tx['to'] == user:
                     cache_state[collection_name]['state']['balances'][user] += Decimal(str(tx['amount']))
                         
