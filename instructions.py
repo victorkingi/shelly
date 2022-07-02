@@ -2280,7 +2280,7 @@ def test():
     first = True
     last_instr = []
     i = 0
-    '''
+    
     for doc in results:
         if doc.id == 'cleared':
             continue
@@ -2661,7 +2661,7 @@ def test():
             raise RuntimeError(f"Invalid category provided {doc_val['values']['category'].lower()}")
 
         i += 1
-    '''
+    
     print("total", i)
 
     for doc in eggs_docs:
