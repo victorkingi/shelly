@@ -75,7 +75,6 @@ cache_deleted = {} # no need to keep track of this as entries are only dumped in
 cache_ui_txs = {}
 cache_verification_data = {}
 cache_dashboard_data = {}
-temp_all_hashes = {}
 
 
 def push(elem=None, stack=None, memory=None, pc=None, analysed=None):
@@ -435,8 +434,7 @@ def update_cache(stack=None, memory=None, pc=None, analysed=None):
         cache_state['world_state']['main'] = state_dict
         state_dict = collection_ref.document('prev_states').get().to_dict()
         cache_state['world_state']['prev_states'] = state_dict
-        global temp_all_hashes
-        temp_all_hashes = dict(cache_state['world_state']['main']['all_hashes'])
+        memory['TRUEHASHES'] = dict(cache_state['world_state']['main']['all_hashes'])
         map_nested_dicts_modify(cache_state, lambda v: Decimal(f'{v}') if isinstance(v, float) or isinstance(v, int) else v)
         log.debug("Updated main state")
         return stack, memory, pc, cache_state, cache_accounts
@@ -1995,23 +1993,27 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
                 return stack, memory, -2, cache_state, cache_accounts
         
         # if no new delete or create happened in cloud, then maybe prev values was updated
-        local_true_hashes = set(temp_all_hashes[x].values())
+        local_true_hashes = set(memory['TRUEHASHES'][x].values())
         remote_true_hashes = set(remote_ws_dict['all_hashes'][x].values())
         prev_val_change = remote_true_hashes - local_true_hashes # this will only include remote changes
-
+        #TODO Figure out how to check if true hash was changed without new entry being created
         if len(prev_val_change) != 0:
-            log.info("Change happened in remote, prev value, rerun signal sent...")
+            pass
+            #log.info("Change happened in remote, prev value, rerun signal sent...")
 
-            db.collection('mutex_lock').document('lock').set({'is_lock_held': 0, 'process_name': ''})
-            log.info("Lock released!")
-            return stack, memory, -2, cache_state, cache_accounts
+            #db.collection('mutex_lock').document('lock').set({'is_lock_held': 0, 'process_name': ''})
+            #log.info("Lock released!")
+            #return stack, memory, -2, cache_state, cache_accounts
 
         col_ref = db.collection(x)
         i = 0
         log.info(f"committing {x} docs...")
         bar = FillingCirclesBar(f'Committing {x}', max=len(cache_state[x].keys()) if len(cache_state[x].keys()) != 0 else 1)
+        k = 0
         for id in cache_state[x]:
             if id in remote_ws_dict['all_hashes'][x]:
+                log.debug(f"found matching id in {x}: {id}")
+                log.debug(f"true hash local: {cache_state[x][id]['true_hash']}, remote: {remote_ws_dict['all_hashes'][x][id]}")
                 if cache_state[x][id]['true_hash'] == remote_ws_dict['all_hashes'][x][id]:
                     # silently skip already written data
                     log.debug(f"skipped {x}: {id}")
@@ -2022,6 +2024,10 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
             i += 1
             log.info(f"committed entry {i} of {len(cache_state[x].keys())}: {id}")
             bar.next()
+            k += 1
+        for m in range(len(cache_state[x].keys()) - k if len(cache_state[x].keys()) != 0 else 1):
+            bar.next()
+
         bar.next()
         bar.finish()
 
@@ -2044,6 +2050,7 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
     i = 0
     log.info(f"committing UI txs docs...")
     bar = FillingCirclesBar(f'Committing UI txs', max=len(cache_ui_txs.keys()) if len(cache_ui_txs.keys()) != 0 else 1)
+    #TODO skip by checking true hash and id as well
     for id in cache_ui_txs:
         for x in EVENTC.values():
             if id in remote_ws_dict['all_hashes'][x]:
