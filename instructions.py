@@ -1,6 +1,7 @@
 # Instructions
 from functools import reduce
 from decimal import *
+from pickle import FALSE
 from firebase_admin import credentials
 from firebase_admin import firestore
 from datetime import datetime as dt
@@ -435,6 +436,7 @@ def update_cache(stack=None, memory=None, pc=None, analysed=None):
         state_dict = collection_ref.document('prev_states').get().to_dict()
         cache_state['world_state']['prev_states'] = state_dict
         memory['TRUEHASHES'] = dict(cache_state['world_state']['main']['all_hashes'])
+        #print("UPDATE", memory['TRUEHASHES']['dead_sick']['16f1840ca7dc95b5455698c8544858f1597a24c5da564195bb46a868f8abe807'])
         map_nested_dicts_modify(cache_state, lambda v: Decimal(f'{v}') if isinstance(v, float) or isinstance(v, int) else v)
         log.debug("Updated main state")
         return stack, memory, pc, cache_state, cache_accounts
@@ -863,12 +865,12 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
     message = message[:MAX_CHAR_COUNT_LOG]+"..." if len(message) > MAX_CHAR_COUNT_LOG else message
     log.debug(message)
     cache_state[collection_name] = {k: v for k, v in sorted_tuples}
+    cache_state[collection_name]['state'] = dict(clean_states(all_tx_hashes=cache_state[collection_name]['state']['all_tx_hashes'])[collection_name]['state'])
+    cache_state[collection_name]['prev_states'] = dict(clean_states(all_tx_hashes=cache_state[collection_name]['state']['all_tx_hashes'])[collection_name]['prev_states'])
 
-    is_first = True
     next_week = Decimal(0)
     next_month = Decimal(0)
     i = 0
-    
     if collection_name == EVENTC[TRADE]:
         cache_state[collection_name]['state']['balances'] = {}
         for user in cache_accounts:
@@ -1456,7 +1458,7 @@ def calculate_root_hash(stack=None, memory=None, pc=None, analysed=None):
     sorted_tuples = sorted(cache_state[collection_name].items(), key=lambda item: item[1]['date']['unix'] if 'date' in item[1] and 'unix' in item[1]['date'] else Decimal(0))
     cache_state[collection_name] = {k: v for k, v in sorted_tuples}
     
-    true_hashes = []
+    true_hashes = {}
     
     for id in cache_state[collection_name]:
         if id == 'state' or id == 'prev_states':
@@ -1465,18 +1467,16 @@ def calculate_root_hash(stack=None, memory=None, pc=None, analysed=None):
         tx = cache_state[collection_name][id]
 
         log.debug(f"{collection_name} id: {id}")
-        true_hashes.append(get_true_hash_for_tx(tx, collection_name))
+        true_hashes[id] = get_true_hash_for_tx(tx, collection_name)
 
     i = 0
-    for id in cache_state[collection_name]:
-        if id == 'state' or id == 'prev_states':
-            continue
-        cache_state[collection_name]['state']['all_tx_hashes'][id]['true_hash'] = true_hashes[i]
-        cache_state['world_state']['main']['all_hashes'][collection_name][id] = true_hashes[i]
+    for id_ in true_hashes:
+        cache_state[collection_name]['state']['all_tx_hashes'][id_]['true_hash'] = true_hashes[id_]
+        cache_state['world_state']['main']['all_hashes'][collection_name][id_] = true_hashes[id_]
         i += 1
              
-    stack.push(true_hashes)
-    stack.push(Decimal(len(true_hashes)))
+    stack.push(list(true_hashes.values()))
+    stack.push(Decimal(len(true_hashes.values())))
         
     return stack, memory, pc, cache_state, cache_accounts
 
@@ -1559,7 +1559,6 @@ def calculate_main_state(stack=None, memory=None, pc=None, analysed=None):
 
 
     total_birds = starting_birds_no - cache_state['dead_sick']['state']['total_dead']
-    world_state = cache_state['world_state']['main']
     total_birds = Decimal(total_birds)
 
 
@@ -1993,17 +1992,16 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
                 return stack, memory, -2, cache_state, cache_accounts
         
         # if no new delete or create happened in cloud, then maybe prev values was updated
-        local_true_hashes = set(memory['TRUEHASHES'][x].values())
-        remote_true_hashes = set(remote_ws_dict['all_hashes'][x].values())
-        prev_val_change = remote_true_hashes - local_true_hashes # this will only include remote changes
-        #TODO Figure out how to check if true hash was changed without new entry being created
-        if len(prev_val_change) != 0:
-            pass
-            #log.info("Change happened in remote, prev value, rerun signal sent...")
+        for key in memory['TRUEHASHES'][x]:
+            if key in remote_ws_dict['all_hashes'][x]:
+                if remote_ws_dict['all_hashes'][x][key] != memory['TRUEHASHES'][x][key]:
+                    # if true hashes don't match
+                    log.info("Change happened in remote, prev value, rerun signal sent...")
 
-            #db.collection('mutex_lock').document('lock').set({'is_lock_held': 0, 'process_name': ''})
-            #log.info("Lock released!")
-            #return stack, memory, -2, cache_state, cache_accounts
+                    db.collection('mutex_lock').document('lock').set({'is_lock_held': 0, 'process_name': ''})
+                    log.info("Lock released!")
+                    return stack, memory, -2, cache_state, cache_accounts
+
 
         col_ref = db.collection(x)
         i = 0
@@ -2012,12 +2010,15 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
         k = 0
         for id in cache_state[x]:
             if id in remote_ws_dict['all_hashes'][x]:
+                if x == EVENTC[TRADE]:
+                    #continue
+                    pass
                 log.debug(f"found matching id in {x}: {id}")
                 log.debug(f"true hash local: {cache_state[x][id]['true_hash']}, remote: {remote_ws_dict['all_hashes'][x][id]}")
                 if cache_state[x][id]['true_hash'] == remote_ws_dict['all_hashes'][x][id]:
                     # silently skip already written data
                     log.debug(f"skipped {x}: {id}")
-                    continue
+                    #continue
             doc_ref = col_ref.document(id)
             batch.set(doc_ref, cache_state[x][id])
             batch.commit()
@@ -2050,13 +2051,21 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
     i = 0
     log.info(f"committing UI txs docs...")
     bar = FillingCirclesBar(f'Committing UI txs', max=len(cache_ui_txs.keys()) if len(cache_ui_txs.keys()) != 0 else 1)
-    #TODO skip by checking true hash and id as well
     for id in cache_ui_txs:
+        continue_outer = False
         for x in EVENTC.values():
             if id in remote_ws_dict['all_hashes'][x]:
-                # silently skip already written data
-                log.debug(f"skipped UI tx {x}: {id}")
-                continue
+                if remote_ws_dict['all_hashes'][x][id] == cache_ui_txs[id]['data']['true_hash']:
+                    # silently skip already written data
+                    log.debug(f"skipped UI tx {x}: {id} of true hash {cache_ui_txs[id]['data']['true_hash']}")
+                    continue_outer = False
+                
+                # break from inner loop since the id cannot exist in a different collection
+                break
+        
+        if continue_outer:
+            continue
+                    
         doc_ref = tx_ui_col_ref.document(id)
         batch.set(doc_ref, cache_ui_txs[id])
         batch.commit()
@@ -2089,15 +2098,205 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
 
     return stack, memory, pc, cache_state, cache_accounts
 
-# each week and month is represented by a timestamp
-# month is current_timestamp+28days, week is current_timestamp+7days
-def initialise():
-    print("initialising...")
-    all_collections = []
+
+def clean_states(all_tx_hashes={}):
+    return_val = {'world_state': {}}
     for name in cache_state:
         if name == 'world_state':
             continue
-        all_collections.append(name)
+        state = dict(cache_state[name]['state'])
+
+        if name == 'eggs_collected':
+            state['total_eggs'] = 0
+            sections = ['a1','a2', 'b1', 'b2', 'c1', 'c2', 'broken', 'house']
+            for sec in sections:
+                state[f'total_eggs_{sec}'] = 0
+
+            state['trays_collected_to_timestamp'] = {}
+            state['diff_trays_to_exact'] = {} # 0 represents unix 0
+            state['week_trays_and_exact'] = {'1618261200': {'trays_collected': '0,0', 'exact': '0,0'}} # 0 represents timestamp week 0
+            state['month_trays_and_exact'] = {'1618261200': {'trays_collected': '0,0', 'exact': '0,0'}} # 0 represents month 0
+            state['change_week'] = {'1618261200': {'change_trays_collected': 0, 'change_exact': 0 }} # 0 represents (week 0 - week 0), 1 will represent (week 1 - week 0)
+            state['change_month'] = {'1618261200': {'change_trays_collected': 0, 'change_exact': 0 }} # 0 represents (month 0 - month 0), 1 will represent (month 1 - month 0)
+
+        elif name == 'sales':
+            state['total_sales'] = 0
+            state['total_earned'] = 0
+            state['total_trays_sold'] = 0
+            sections = ['thikafarmers', 'other', 'cakes', 'duka']
+            for sec in sections:
+                state[f'total_earned_{sec}'] = 0
+                state[f'total_trays_sold_{sec}'] = 0
+            # everytime there is a new buyer, we will add a new field total_earned_other_buyer_name
+
+            state['week_trays_sold_earned'] = {'1652734800': {
+                'trays_sold': 0,
+                'earned': 0,
+                f'earned_{sections[0]}': 0,
+                f'earned_{sections[1]}': 0,
+                f'earned_{sections[2]}': 0,
+                f'earned_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                f'trays_sold_{sections[0]}': 0,
+                f'trays_sold_{sections[1]}': 0,
+                f'trays_sold_{sections[2]}': 0,
+                f'trays_sold_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                }
+            }
+            state['month_trays_sold_earned'] = {'1656968400': {
+                'trays_sold': 0,
+                'earned': 0,
+                f'earned_{sections[0]}': 0,
+                f'earned_{sections[1]}': 0,
+                f'earned_{sections[2]}': 0,
+                f'earned_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                f'trays_sold_{sections[0]}': 0,
+                f'trays_sold_{sections[1]}': 0,
+                f'trays_sold_{sections[2]}': 0,
+                f'trays_sold_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                }
+            }
+            state['change_week'] = {'1652734800': {
+                'change_trays_sold': 0,
+                'change_earned': 0,
+                f'change_earned_{sections[0]}': 0,
+                f'change_earned_{sections[1]}': 0,
+                f'change_earned_{sections[2]}': 0,
+                f'change_earned_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                f'change_trays_sold_{sections[0]}': 0,
+                f'change_trays_sold_{sections[1]}': 0,
+                f'change_trays_sold_{sections[2]}': 0,
+                f'change_trays_sold_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                }
+            }
+            state['change_month'] = {'1656968400': {
+                'change_trays_sold': 0,
+                'change_earned': 0,
+                f'change_earned_{sections[0]}': 0,
+                f'change_earned_{sections[1]}': 0,
+                f'change_earned_{sections[2]}': 0,
+                f'change_earned_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                f'change_trays_sold_{sections[0]}': 0,
+                f'change_trays_sold_{sections[1]}': 0,
+                f'change_trays_sold_{sections[2]}': 0,
+                f'change_trays_sold_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                }
+            }
+
+        elif name == 'purchases':
+            state['total_purchases'] = 0
+            state['total_spent'] = 0
+            state['total_items_bought'] = 0
+            sections = ['feeds', 'drugs', 'other', 'purity', 'ppurity']
+            for sec in sections:
+                state[f'total_spent_{sec}'] = 0
+                state[f'total_items_bought_{sec}'] = 0
+            # everytime there is a new buyer, we will add a new field total_earned_other_buyer_name
+
+            state['week_items_bought_spent'] = {'1652734800': {
+                'items_bought': 0,
+                'spent': 0,
+                f'spent_{sections[0]}': 0,
+                f'spent_{sections[1]}': 0,
+                f'spent_{sections[2]}': 0,
+                f'spent_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                f'spent_{sections[4]}': 0,
+                f'items_bought_{sections[0]}': 0,
+                f'items_bought_{sections[1]}': 0,
+                f'items_bought_{sections[2]}': 0,
+                f'items_bought_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                f'items_bought_{sections[4]}': 0
+                }
+            }
+            state['month_items_bought_spent'] = {'1656968400': {
+                'items_bought': 0,
+                'spent': 0,
+                f'spent_{sections[0]}': 0,
+                f'spent_{sections[1]}': 0,
+                f'spent_{sections[2]}': 0,
+                f'spent_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                f'spent_{sections[4]}': 0,
+                f'items_bought_{sections[0]}': 0,
+                f'items_bought_{sections[1]}': 0,
+                f'items_bought_{sections[2]}': 0,
+                f'items_bought_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                f'items_bought_{sections[4]}': 0
+                }
+            }
+            state['change_week'] = {'1652734800': {
+                'change_items_bought': 0,
+                'change_spent': 0,
+                f'change_spent_{sections[0]}': 0,
+                f'change_spent_{sections[1]}': 0,
+                f'change_spent_{sections[2]}': 0,
+                f'change_spent_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                f'change_spent_{sections[4]}': 0,
+                f'change_items_bought_{sections[0]}': 0,
+                f'change_items_bought_{sections[1]}': 0,
+                f'change_items_bought_{sections[2]}': 0,
+                f'change_items_bought_{sections[3]}': 0, # earned_other_buyer_name added 
+                f'change_items_bought_{sections[4]}': 0
+                }
+            }
+            state['change_month'] = {'1656968400': {
+                'change_items_bought': 0,
+                'change_spent': 0,
+                f'change_spent_{sections[0]}': 0,
+                f'change_spent_{sections[1]}': 0,
+                f'change_spent_{sections[2]}': 0,
+                f'change_spent_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                f'change_spent_{sections[4]}': 0,
+                f'change_items_bought_{sections[0]}': 0,
+                f'change_items_bought_{sections[1]}': 0,
+                f'change_items_bought_{sections[2]}': 0,
+                f'change_items_bought_{sections[3]}': 0, # earned_other_buyer_name added whenever
+                f'change_items_bought_{sections[4]}': 0
+                }
+            }
+
+        elif name == 'dead_sick':
+            state['total_dead'] = 0
+        
+        elif name == 'trades':
+            def f(v):
+                return float(v)
+            state['balances'] = {k: f(v) for k, v in cache_accounts.items()}
+
+        if name in return_val:
+            state['all_tx_hashes'] = all_tx_hashes
+            return_val[name]['state'] = dict(state)
+            return_val[name]['prev_states'] = {'0': dict(state) }
+        else:
+            return_val[name] = {}
+            state['all_tx_hashes'] = all_tx_hashes
+            return_val[name]['state'] = dict(state)
+            return_val[name]['prev_states'] = {'0': dict(state) }
+    
+    world_state = {
+        'week_laying_percent': {'1618261200': {}},
+        'month_laying_percent': {'1618261200': {}},
+        'week_profit': {'0': 0 },
+        'month_profit': {'0': 0 },
+        'total_profit': 0,
+        'available_to_withdraw': {'VICTOR': 0, 'BABRA': 0, 'JEFF': 0},
+        'age_of_birds': {'start_date': {'unix': 1583746320, 'locale': '03/09/2020, 12:32:00, Africa/Nairobi'}, 'age': {'unix': time.time() - 1583746320, 'years': (time.time() - 1583746320) / (12 * 4 * 7 * 24 * 60 * 60), 'months': (time.time() - 1583746320) / (4 * 7 * 24 * 60 * 60), 'weeks': (time.time() - 1583746320) / (7 * 24 * 60 * 60) }},
+        'total_birds': 1, # divide by zero error
+        'root': '',
+        'col_roots': [],
+        'all_hashes': {'sales': {}, 'purchases': {}, 'trades': {}, 'eggs_collected': {}, 'dead_sick': {}, 'deleted': {}}
+    }
+    
+    return_val['world_state']['main'] = dict(world_state)
+    return_val['world_state']['prev_states'] = { '0': dict(world_state) }
+    return return_val
+
+
+# each week and month is represented by a timestamp
+# month is current_timestamp+28days, week is current_timestamp+7days
+def initialise_db():
+    print("initialising...")
+    for name in cache_state:
+        if name == 'world_state':
+            continue
         collection_ref = db.collection(name)
         state = cache_state[name]['state']
 
@@ -2277,10 +2476,11 @@ def initialise():
     }
     
     global_state_ref.document('main').set(world_state)
-    collection_ref.document('prev_states').set({'0': state })
+    collection_ref.document('prev_states').set({'0': world_state })
     db.collection('mutex_lock').document('lock').set({'is_lock_held': 0, 'process_name': ''})
 
-#initialise()
+
+#initialise_db()
 
 # on create, cloud function, gets all in ascending creates code
 # removes last and first, executes without write

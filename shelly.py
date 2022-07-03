@@ -35,12 +35,12 @@ if __name__ == '__main__':
                 trade = [26, 45, 26, 654, 26, '',26, '',26, 'hfdg', 26, 'BLACK_HOLE', 26, '5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9', 26, 'dfgh', 26, 0, 26, 'TRADE', 14]
                 ds = [26, 'gfsd', 26, 'dfgs', 26, 1, 26, 253, 26, '5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9',26, 'dfgh',26, 'dfgh',26, 'https://google.com', 26, 'dfgh', 26, 0, 26, 'DS', 14]
                 end = [0, 'dead_sick', 0, 1, 1, 0, 1, 1, 24, 25, 14, 26]+[0, 'eggs_collected', 0, 1, 1, 0, 1, 1, 24, 25, 14, 26]+[0, 'trades', 0, 1, 1, 0, 1, 1, 24, 25, 14, 26, 0, 'purchases', 0, 1, 1, 0, 1, 1, 24, 25, 14, 26]+[0, 'sales', 0, 1, 1, 0, 1, 1, 24, 25, 14, 26, 27, 14, 0, 'main', 2, 26, 31]
-                
+                start = [0, 'sales', 0, 'purchases', 0, 'trades', 0, 'world_state', 0, 'eggs_collected', 0, 'dead_sick', 20, 20, 20, 20, 20, 20]
                 signal = -2
                 res, acc, state = None, None, None
-
-                while signal == -2: 
-                    vm_ = VM(test()+end[:-1]+[37, 38, 39, 40, 31])
+                retries = 0
+                while signal == -2:
+                    vm_ = VM(start+end[:-1]+[37, 38, 39, 40, 31])
                     #cops = CommonOps()
                     #vm_ = VM(flattened_code)
                     # 1647291600 1640034000
@@ -48,6 +48,10 @@ if __name__ == '__main__':
                     res, state, acc, signal = vm_.execute()
                     if signal == -2:
                         print("re-run signal received!")
+                        retries += 1
+                        if retries > 4:
+                            print("exceeded maximum rerun attempts of", retries)
+                            break
                     
                 print("vm result:", res)
                 if state is not None and acc is not None:
