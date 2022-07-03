@@ -1446,10 +1446,6 @@ def decr_balance(stack=None, memory=None, pc=None, analysed=None):
     return stack, memory, pc, cache_state, cache_accounts
 
 
-def get_dicts():
-    return cache_deleted, cache_ui_txs, cache_dashboard_data, cache_verification_data
-
-
 def calculate_root_hash(stack=None, memory=None, pc=None, analysed=None):
     log.debug(f"{pc}: CALCROOTHASH")
     pc += 1

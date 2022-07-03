@@ -25,10 +25,6 @@ class VM:
         self.pc = 0             # program counter
         self.cache_state = {}
         self.cache_accounts = {}
-        self.cache_deleted = {}
-        self.cache_ui_txs = {}
-        self.cache_verification_data = {}
-        self.cache_dashboard_data = {}
         self.analysed_code = {}
         self.is_safe = self.check_safety()
 
@@ -508,8 +504,6 @@ class VM:
 
                 # reset log with unneccessary data
                 self.clear_log()
-
-                self.cache_deleted, self.cache_ui_txs, self.cache_dashboard_data, self.cache_verification_data = get_dicts()
 
                 if self.stack.size():
                     # no update was made to firestore, hence just return computed output
