@@ -1,7 +1,0 @@
-
- === Uncaught Python exception: ===
-AttributeError: 'VM' object has no attribute 'pop'
-Traceback (most recent call last):
-  File "/home/viczking/core101/core101/main_fuzz.py", line 32, in TestLexer
-    final_ans = vm_.pop()
-

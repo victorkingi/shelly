@@ -1,6 +1,6 @@
 # Shelly
 
-Credit to [CodePulse](https://www.youtube.com/watch?v=Eythq9848Fg&list=PLZQftyCk7_SdoVexSmwy_tBgs7P0b97yD) on youtube for providing a high level view of how the basic programming language was created. He's playlist provides a guide to creating an intepretor but this project pushes the idea further to a language with an assembly-like compile target.
+Credit to [CodePulse](https://www.youtube.com/watch?v=Eythq9848Fg&list=PLZQftyCk7_SdoVexSmwy_tBgs7P0b97yD) on youtube for providing a high level view of how [BASIC](https://en.wikipedia.org/wiki/BASIC) programming language was created. He's playlist provides a guide to creating an intepretor but this project pushes the idea further to a language with an assembly-like compile target.
 
 A programming language still in development that compiles down to an instruction set used in `vm.py`. This programming language helps to solve a common problem I have had with managing complex databases i.e. keeping track of sales records in a company where sometimes, a wrong input leads to an impossible problem to fix.
 
