@@ -2007,26 +2007,27 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
         i = 0
         log.info(f"committing {x} docs...")
         bar = FillingCirclesBar(f'Committing {x}', max=len(cache_state[x].keys()) if len(cache_state[x].keys()) != 0 else 1)
-        k = 0
         for id in cache_state[x]:
+            is_skip = False
             if id in remote_ws_dict['all_hashes'][x]:
-                if x == EVENTC[TRADE]:
-                    #continue
-                    pass
                 log.debug(f"found matching id in {x}: {id}")
                 log.debug(f"true hash local: {cache_state[x][id]['true_hash']}, remote: {remote_ws_dict['all_hashes'][x][id]}")
                 if cache_state[x][id]['true_hash'] == remote_ws_dict['all_hashes'][x][id]:
                     # silently skip already written data
                     log.debug(f"skipped {x}: {id}")
-                    #continue
+                    is_skip = True
+            
+            if is_skip:
+                continue
+            
             doc_ref = col_ref.document(id)
             batch.set(doc_ref, cache_state[x][id])
             batch.commit()
             i += 1
             log.info(f"committed entry {i} of {len(cache_state[x].keys())}: {id}")
             bar.next()
-            k += 1
-        for m in range(len(cache_state[x].keys()) - k if len(cache_state[x].keys()) != 0 else 1):
+
+        for m in range(len(cache_state[x].keys()) - i if len(cache_state[x].keys()) != 0 else 1):
             bar.next()
 
         bar.next()
@@ -2058,7 +2059,7 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
                 if remote_ws_dict['all_hashes'][x][id] == cache_ui_txs[id]['data']['true_hash']:
                     # silently skip already written data
                     log.debug(f"skipped UI tx {x}: {id} of true hash {cache_ui_txs[id]['data']['true_hash']}")
-                    continue_outer = False
+                    continue_outer = True
                 
                 # break from inner loop since the id cannot exist in a different collection
                 break
@@ -2072,6 +2073,10 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
         i += 1
         log.info(f"committed entry {i} of {len(cache_ui_txs.keys())}: {id}")
         bar.next()
+    
+    for m in range(len(cache_ui_txs.keys()) - i if len(cache_ui_txs.keys()) != 0 else 1):
+        bar.next()
+
     bar.next()
     bar.finish()
 
