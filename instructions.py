@@ -1,14 +1,12 @@
 # Instructions
 from functools import reduce
 from decimal import *
-from pickle import FALSE
 from firebase_admin import credentials
 from firebase_admin import firestore
 from datetime import datetime as dt
 from dateutil import tz
 from progress.bar import FillingCirclesBar
 import time
-import sys
 import re
 
 from opcodes import Opcodes

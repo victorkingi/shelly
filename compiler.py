@@ -4,7 +4,6 @@ from decimal import *
 
 from opcodes import Opcodes
 from constants import *
-from nodes import NumberNode, UnaryOpNode, BinOpNode
 from error import NoVisitMethodError, RuntimeError
 
 class Number:

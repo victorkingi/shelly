@@ -62,5 +62,3 @@ class Opcodes(AutoName):
     VERIFYCOL = auto()
     DASHBOARD = auto()
     WRITE = auto()
-
-#print(Opcodes.CENTRY.value)

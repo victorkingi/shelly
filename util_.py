@@ -253,9 +253,8 @@ def to_area_chart_dict(x_axis=[], y_axis=[], label=''):
         'y': y_axis,
         'x': x_axis
     }
-    labels = []
 
-    for idx, _ in enumerate(x_axis):
+    for _, _ in enumerate(x_axis):
         data['backgroundColor'].append(rgba_random_generator(alpha=0.2))
         data['borderColor'].append(rgba_random_generator(alpha=1))
 
