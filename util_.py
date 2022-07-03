@@ -278,21 +278,6 @@ def laying_percent_for_a_day(unix_epoch, dead_docs, eggs):
     return percent
 
 
-def get_collection_hashes(collection_name, cache_state):
-    hashes = []
-    for key in cache_state[collection_name]:
-        if key != 'state' and key != 'prev_states':
-            is_valid_hash = re.search("^[a-f0-9]{64}$", key)
-
-            if not is_valid_hash:
-                log.warning(f"Key appended not a valid hash, {to_check_hash}")
-                return []
-            
-            hashes.append(key)
-    
-    return hashes
-
-
 def string_with_arrows(text, pos_start, pos_end):
     result = ''
 
