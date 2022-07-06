@@ -1973,7 +1973,7 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
         return None, None, None, None, None
     elif not sanity_trays_to_sales_check(cache_state=cache_state):
         log.error("Sanity check failed, a sale is invalid, due to trays used")
-        #return None, None, None, None, None
+        return None, None, None, None, None
     else:
         log.info("sanity check passed, proceeding with push...")
 
