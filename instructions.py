@@ -1957,8 +1957,8 @@ def update_dashboard_data(stack=None, memory=None, pc=None, analysed=None):
         'last_trades': last_trades,
         'week_laying_chart_exact': to_area_chart_dict(x_axis=x_axis_eggs, y_axis=y_axis_exact, label='Exact'),
         'week_laying_chart_given': to_area_chart_dict(x_axis=x_axis_eggs, y_axis=y_axis_given, label='Given'),
-        'week_profit': to_area_chart_dict(x_axis=x_axis_week_profit, y_axis=y_axis_week_profit, label='Profit per Week'),
-        'month_profit': to_area_chart_dict(x_axis=x_axis_month_profit, y_axis=y_axis_month_profit, label='Profit per Month')
+        'week_profit_chart': to_area_chart_dict(x_axis=x_axis_week_profit, y_axis=y_axis_week_profit, label='Profit per Week'),
+        'month_profit_chart': to_area_chart_dict(x_axis=x_axis_month_profit, y_axis=y_axis_month_profit, label='Profit per Month')
     }
 
     log.info(f"Dashboard data updated")
