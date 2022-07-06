@@ -431,6 +431,7 @@ def update_cache(stack=None, memory=None, pc=None, analysed=None):
     if collection_name == 'world_state':
         state_dict = collection_ref.document('main').get().to_dict()
         cache_state['world_state']['main'] = state_dict
+        cache_state['world_state']['main']['col_roots'] = []
         state_dict = collection_ref.document('prev_states').get().to_dict()
         cache_state['world_state']['prev_states'] = state_dict
         memory['TRUEHASHES'] = {
@@ -1712,7 +1713,6 @@ def calculate_main_state(stack=None, memory=None, pc=None, analysed=None):
     cache_state['world_state']['main']['week_profit'] = week_profit
     cache_state['world_state']['main']['month_profit'] = month_profit
     cache_state['world_state']['main']['total_birds'] = total_birds
-    #cache_state['world_state']['']
     cache_state['world_state']['main']['trays_available'] = get_eggs_diff(all_trays_collected, all_trays_sold)[0]
 
     to_hash_list = [cache_state['sales']['state']['root_hash'], cache_state['purchases']['state']['root_hash'], cache_state['eggs_collected']['state']['root_hash'], cache_state['dead_sick']['state']['root_hash'], cache_state['trades']['state']['root_hash']]
@@ -1936,7 +1936,13 @@ def update_dashboard_data(stack=None, memory=None, pc=None, analysed=None):
     # chart data for week laying percent
     y_axis_exact = [v['percent_exact'] if 'percent_exact' in v else Decimal(0) for _, v in cache_state['eggs_collected']['state']['week_trays_and_exact'].items()]
     y_axis_given = [v['percent_given'] if 'percent_given' in v else Decimal(0) for _, v in cache_state['eggs_collected']['state']['week_trays_and_exact'].items()]
-    x_axis = [Decimal(k) for k in cache_state['eggs_collected']['state']['week_trays_and_exact']]
+    x_axis_eggs = [Decimal(k) for k in cache_state['eggs_collected']['state']['week_trays_and_exact']]
+
+    # chart for profit
+    y_axis_week_profit = [Decimal(v) for _, v in cache_state['world_state']['main']['week_profit'].items()]
+    y_axis_month_profit = [v for _, v in cache_state['world_state']['main']['month_profit'].items()]
+    x_axis_week_profit = [Decimal(k) for k in cache_state['world_state']['main']['week_profit']]
+    x_axis_month_profit = [Decimal(k) for k in cache_state['world_state']['main']['month_profit']]
 
     global cache_dashboard_data
     cache_dashboard_data = {
@@ -1949,8 +1955,10 @@ def update_dashboard_data(stack=None, memory=None, pc=None, analysed=None):
         'laying': laying_data,
         'trays_avail': trays_avail,
         'last_trades': last_trades,
-        'week_laying_chart_exact': to_area_chart_dict(x_axis=x_axis, y_axis=y_axis_exact, label='Exact'),
-        'week_laying_chart_given': to_area_chart_dict(x_axis=x_axis, y_axis=y_axis_given, label='Given')
+        'week_laying_chart_exact': to_area_chart_dict(x_axis=x_axis_eggs, y_axis=y_axis_exact, label='Exact'),
+        'week_laying_chart_given': to_area_chart_dict(x_axis=x_axis_eggs, y_axis=y_axis_given, label='Given'),
+        'week_profit': to_area_chart_dict(x_axis=x_axis_week_profit, y_axis=y_axis_week_profit, label='Profit per Week'),
+        'month_profit': to_area_chart_dict(x_axis=x_axis_month_profit, y_axis=y_axis_month_profit, label='Profit per Month')
     }
 
     log.info(f"Dashboard data updated")
@@ -2089,12 +2097,11 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
             
             if is_skip:
                 continue
-            print(x, id)
             doc_ref = col_ref.document(id)
             batch.set(doc_ref, cache_state[x][id])
             batch.commit()
             i += 1
-            log.info(f"committed entry {i} of {len(cache_state[x].keys())}: {id}")
+            log.info(f"committed {x} entry {i} of {len(cache_state[x].keys())}: {id}")
             bar.next()
         
         if i == 0:
