@@ -34,7 +34,7 @@ if __name__ == '__main__':
                 res, acc, state = None, None, None
                 retries = 0
                 while signal == -2:
-                    vm_ = VM(test()+end[:-1]+[37, 38, 39, 40, 31])
+                    vm_ = VM(start+end[:-1]+[37, 38, 39, 40, 31])
                     vm_.analyse()
                     res, state, acc, signal = vm_.execute()
                     if signal == -2:

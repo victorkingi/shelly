@@ -433,12 +433,31 @@ def update_cache(stack=None, memory=None, pc=None, analysed=None):
         cache_state['world_state']['main'] = state_dict
         state_dict = collection_ref.document('prev_states').get().to_dict()
         cache_state['world_state']['prev_states'] = state_dict
-        memory['TRUEHASHES'] = dict(cache_state['world_state']['main']['all_hashes'])
-        #print("UPDATE", memory['TRUEHASHES']['dead_sick']['16f1840ca7dc95b5455698c8544858f1597a24c5da564195bb46a868f8abe807'])
+        memory['TRUEHASHES'] = {
+            EVENTC[EGGS]: {
+                'entry': set(cache_state['world_state']['main']['all_hashes'][EVENTC[EGGS]].keys()),
+                'true': set(cache_state['world_state']['main']['all_hashes'][EVENTC[EGGS]].values()),
+            },
+            EVENTC[SELL]: {
+                'entry': set(cache_state['world_state']['main']['all_hashes'][EVENTC[SELL]].keys()),
+                'true': set(cache_state['world_state']['main']['all_hashes'][EVENTC[SELL]].values()),
+            },
+            EVENTC[BUY]: {
+                'entry': set(cache_state['world_state']['main']['all_hashes'][EVENTC[BUY]].keys()),
+                'true': set(cache_state['world_state']['main']['all_hashes'][EVENTC[BUY]].values()),
+            },
+            EVENTC[DS]: {
+                'entry': set(cache_state['world_state']['main']['all_hashes'][EVENTC[DS]].keys()),
+                'true': set(cache_state['world_state']['main']['all_hashes'][EVENTC[DS]].values()),
+            },
+            EVENTC[TRADE]: {
+                'entry': set(cache_state['world_state']['main']['all_hashes'][EVENTC[TRADE]].keys()),
+                'true': set(cache_state['world_state']['main']['all_hashes'][EVENTC[TRADE]].values()),
+            }
+        }
         map_nested_dicts_modify(cache_state, lambda v: Decimal(f'{v}') if isinstance(v, float) or isinstance(v, int) else v)
         log.debug("Updated main state")
         return stack, memory, pc, cache_state, cache_accounts
-
 
     state_dict = collection_ref.document('state').get().to_dict()
 
@@ -2029,42 +2048,21 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
 
     batch = db.batch()
 
+    for k,v in memory['TRUEHASHES'].items():
+        for k_, v_ in remote_ws_dict['all_hashes'].items():
+            if k == k_:
+                # the set difference will tell  us if there is a new true/entry hash in the cloud, if so, release lock and rerun code
+                in_remote_true_hash = set(v_.values()) - v['true']
+                in_remote_entry_hash = set(v_.keys()) - v['entry']
+
+                if len(in_remote_true_hash) != 0 or len(in_remote_entry_hash) != 0:
+                    log.info("Change happened in remote, rerun signal sent...")
+
+                    db.collection('mutex_lock').document('lock').set({'is_lock_held': 0, 'process_name': ''})
+                    log.info("Lock released!")
+                    return stack, memory, -2, cache_state, cache_accounts
+
     for x in col_names:
-        local_tx_hashes = set(cache_state['world_state']['main']['all_hashes'][x].keys())
-        remote_tx_hashes = set(remote_ws_dict['all_hashes'][x].keys())
-
-        is_in_remote = remote_tx_hashes - local_tx_hashes
-        for k in is_in_remote:
-            if k not in cache_deleted:
-                # new cloud entry
-                log.info("Change happened in remote, cloud create, rerun signal sent...")
-
-                db.collection('mutex_lock').document('lock').set({'is_lock_held': 0, 'process_name': ''})
-                log.info("Lock released!")
-                return stack, memory, -2, cache_state, cache_accounts
-        
-        is_in_local = local_tx_hashes - remote_tx_hashes
-        for k in is_in_local:
-            if k in remote_ws_dict['all_hashes']['deleted'].keys():
-                # new cloud delete 
-                log.info("Change happened in remote, cloud delete, rerun signal sent...")
-
-                db.collection('mutex_lock').document('lock').set({'is_lock_held': 0, 'process_name': ''})
-                log.info("Lock released!")
-                return stack, memory, -2, cache_state, cache_accounts
-        
-        # if no new delete or create happened in cloud, then maybe prev values was updated
-        for key in memory['TRUEHASHES'][x]:
-            if key in remote_ws_dict['all_hashes'][x]:
-                if remote_ws_dict['all_hashes'][x][key] != memory['TRUEHASHES'][x][key]:
-                    # if true hashes don't match
-                    log.info("Change happened in remote, prev value, rerun signal sent...")
-
-                    #db.collection('mutex_lock').document('lock').set({'is_lock_held': 0, 'process_name': ''})
-                    #log.info("Lock released!")
-                    #return stack, memory, -2, cache_state, cache_accounts
-
-
         col_ref = db.collection(x)
         i = 0
         log.info(f"committing {x} docs...")
@@ -2127,8 +2125,7 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
                 break
         
         if continue_outer:
-            #continue
-            pass
+            continue
                     
         doc_ref = tx_ui_col_ref.document(id)
         batch.set(doc_ref, cache_ui_txs[id])
@@ -3040,14 +3037,19 @@ def delete_collection(coll_ref, batch_size=2000):
     for doc in docs:
         if doc.id == 'cleared':
             continue
-        print(f'Deleting doc {doc.id} => {doc.to_dict()}')
+        vals = doc.to_dict()
+        if 'weirdName' in vals:
+            print("Weird name", vals)
+            continue
+        print(f'Deleting doc {doc.id} => {vals}')
         doc.reference.delete()
         deleted = deleted + 1
 
     if deleted >= batch_size:
         return delete_collection(coll_ref, batch_size)
 
-#delete_collection(coll_ref=db.collection("tx_ui"))
+#delete_collection(coll_ref=db.collection("pending_transactions"))
+#delete_collection(coll_ref=db.collection("pend_eggs_collected"))
 
 inst_mapping = {
     str(Opcodes.PUSH.value): push,
