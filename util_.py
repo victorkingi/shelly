@@ -11,6 +11,30 @@ import collections.abc
 getcontext().traps[FloatOperation] = True
 TWOPLACES = Decimal(10) ** -2
 
+# assert all collections have correct entries
+def sanity_check(cache_state):
+    for k in cache_state:
+        if k == 'world_state':
+            continue
+        
+        id_state_set = set(cache_state[k]['state']['all_tx_hashes'].keys())
+        id_true_state_set = set([v['true_hash'] for _, v in cache_state[k]['state']['all_tx_hashes'].items()])
+
+        id_col_set = set(cache_state[k].keys())
+        id_col_set.remove('state')
+        id_col_set.remove('prev_states')
+
+        id_col_true_set = set()
+        for v in cache_state[k]:
+            if 'true_hash' in cache_state[k][v]:
+                id_col_true_set.add(cache_state[k][v]['true_hash'])
+        
+
+        id_world_set = set(cache_state['world_state']['main']['all_hashes'][k].keys())
+        id_world_true_set = set(cache_state['world_state']['main']['all_hashes'][k].values())
+
+        return (id_state_set == id_col_set == id_world_set) and (id_true_state_set == id_col_true_set == id_world_true_set)
+
 
 def get_true_hash_for_tx(tx, collection_name):
     tx_data_to_hash = ''

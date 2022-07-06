@@ -1967,6 +1967,12 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
     log.debug(f"{pc}: WRITE")
     pc += 1
 
+    if not sanity_check(cache_state=cache_state):
+        log.error("Sanity check failed, some hashes might be missing")
+        return None, None, None, None, None
+    else:
+        log.info("sanity check passed, proceeding with push...")
+
     map_nested_dicts_modify(cache_state, lambda v: float(v) if isinstance(v, Decimal) else v)
     map_nested_dicts_modify(cache_deleted, lambda v: float(v) if isinstance(v, Decimal) else v)
     map_nested_dicts_modify(cache_accounts, lambda v: float(v) if isinstance(v, Decimal) else v)
