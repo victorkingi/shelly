@@ -12,7 +12,7 @@ from stack import Stack
 from instructions import inst_mapping
 from constants import *
 
-EARLIEST_VALID_YEAR = 0 # unix epoch of earliest reasonable data date which is 1st january midnight 2020
+EARLIEST_VALID_YEAR = 1577836800 # unix epoch of earliest reasonable data date which is 1st january midnight 2020
 
 
 class VM:
