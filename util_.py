@@ -11,6 +11,28 @@ import collections.abc
 getcontext().traps[FloatOperation] = True
 TWOPLACES = Decimal(10) ** -2
 
+def sanity_trays_to_sales_check(cache_state):
+    sorted_tuples = sorted(cache_state[EVENTC[SELL]].items(), key=lambda item: item[1]['date']['unix'] if 'date' in item[1] and 'unix' in item[1]['date'] else Decimal(0))
+    cache_state[EVENTC[SELL]] = {k: v for k, v in sorted_tuples}
+    for k, v in cache_state[EVENTC[SELL]].items():
+        if k == 'state' or k == 'prev_states':
+            continue
+        tray_no = v['tray_no']
+        unix_epoch = v['date']['unix']
+        all_trays_sold = [Decimal(v['tray_no']) for k, v in cache_state[EVENTC[SELL]].items() if k != 'state' and k != 'prev_states' and v['date']['unix'] <= unix_epoch]
+        all_trays_collected = [v['trays_collected'] for k, v in cache_state['eggs_collected'].items() if k != 'state' and k != 'prev_states' and v['date']['unix'] <= unix_epoch]
+
+        all_trays_sold = f'{reduce(lambda x, y: x+y, all_trays_sold, Decimal(0))},0'
+        all_trays_collected = reduce(reduce_add_eggs, all_trays_collected, "0,0")
+        remain = get_eggs_diff(all_trays_collected, all_trays_sold)[0]
+        remain = get_eggs_diff(remain, f'{tray_no},0')[1]
+
+        if Decimal(remain) < Decimal(0):
+            return False
+    
+    return True
+
+
 # assert all collections have correct entries
 def sanity_check(cache_state):
     for k in cache_state:

@@ -1277,7 +1277,7 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
                 'percent_exact': percent_exact,
                 'percent_trays_collected': percent_trays_collected
             }
-            state['diff_trays_to_exact'][str(tx['date']['unix'])] = get_eggs_diff(tx['trays_collected'], amount)[0]
+            state['diff_trays_to_exact'][str(int(tx['date']['unix']))] = get_eggs_diff(tx['trays_collected'], amount)[0]
 
             # check if new week or new month
             if tx['date']['unix'] > next_week:
@@ -1712,6 +1712,7 @@ def calculate_main_state(stack=None, memory=None, pc=None, analysed=None):
     cache_state['world_state']['main']['week_profit'] = week_profit
     cache_state['world_state']['main']['month_profit'] = month_profit
     cache_state['world_state']['main']['total_birds'] = total_birds
+    #cache_state['world_state']['']
     cache_state['world_state']['main']['trays_available'] = get_eggs_diff(all_trays_collected, all_trays_sold)[0]
 
     to_hash_list = [cache_state['sales']['state']['root_hash'], cache_state['purchases']['state']['root_hash'], cache_state['eggs_collected']['state']['root_hash'], cache_state['dead_sick']['state']['root_hash'], cache_state['trades']['state']['root_hash']]
@@ -1970,6 +1971,9 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
     if not sanity_check(cache_state=cache_state):
         log.error("Sanity check failed, some hashes might be missing")
         return None, None, None, None, None
+    elif not sanity_trays_to_sales_check(cache_state=cache_state):
+        log.error("Sanity check failed, a sale is invalid, due to trays used")
+        #return None, None, None, None, None
     else:
         log.info("sanity check passed, proceeding with push...")
 
@@ -2085,16 +2089,20 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
             
             if is_skip:
                 continue
-            
+            print(x, id)
             doc_ref = col_ref.document(id)
             batch.set(doc_ref, cache_state[x][id])
             batch.commit()
             i += 1
             log.info(f"committed entry {i} of {len(cache_state[x].keys())}: {id}")
             bar.next()
+        
+        if i == 0:
+            print(x, "no data to push")
 
         for m in range(len(cache_state[x].keys()) - i if len(cache_state[x].keys()) != 0 else 1):
             bar.next()
+            pass
 
         bar.next()
         bar.finish()
@@ -2139,6 +2147,9 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
         i += 1
         log.info(f"committed entry {i} of {len(cache_ui_txs.keys())}: {id}")
         bar.next()
+    
+    if i == 0:
+        print("no UI txs to push")
     
     for m in range(len(cache_ui_txs.keys()) - i if len(cache_ui_txs.keys()) != 0 else 1):
         bar.next()
@@ -2869,14 +2880,14 @@ def test():
             if first:
                 temp_code = ops.create_ds_instructions(values={
                     'image_url': doc_val['values']['url'],
-                    'image_id': doc_val['file_name'],
+                    'image_id': doc_val['values']['photo'],
                     'reason': doc_val['values']['reason'],
                     'number': doc_val['values']['chickenNo'],
                     'by': doc_val['values']['submittedBy'],
                     'date': doc_val['values']['date'].timestamp(),
                     'section': doc_val['values']['section'],
                     'location': doc_val['values']['place'],
-                    'submitted_on': doc_val['submittedOn'].timestamp()
+                    'submitted_on': doc_val['values']['submittedOn'].timestamp()
                 })
                 if not last_instr:
                     last_instr = list(temp_code[-31:])
@@ -2962,7 +2973,7 @@ def test():
                 'broken': doc_val['broken'],
                 'trays_collected': doc_val['trays_store'],
                 'by': doc_val['submittedBy'],
-                'date': doc_val['date_'] / 1000, # in milliseconds
+                'date': doc_val['date_'], # in milliseconds
                 'submitted_on': doc_val['submittedOn'].timestamp(),
             })
             if not last_instr:
@@ -3000,7 +3011,7 @@ def test():
                 'broken': doc_val['broken'],
                 'trays_collected': doc_val['trays_store'],
                 'by': doc_val['submittedBy'],
-                'date': doc_val['date_'] / 1000, # in milliseconds
+                'date': doc_val['date_'], # in milliseconds
                 'submitted_on': doc_val['submittedOn'].timestamp(),
             })
             temp_code = list(temp_code[18:])
