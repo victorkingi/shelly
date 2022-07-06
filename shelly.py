@@ -6,6 +6,7 @@ from decimal import *
 from log_ import fh
 from common_opcodes import *
 from util_ import map_nested_dicts_modify
+from instructions import test
 import json
 
 
@@ -28,12 +29,12 @@ if __name__ == '__main__':
                 compiler_.global_code.append([Opcodes.STOP.value])
                 flattened_code = [item for sublist in compiler_.global_code for item in sublist]
                 end = [0, 'dead_sick', 0, 1, 1, 0, 1, 1, 24, 25, 14, 26]+[0, 'eggs_collected', 0, 1, 1, 0, 1, 1, 24, 25, 14, 26]+[0, 'trades', 0, 1, 1, 0, 1, 1, 24, 25, 14, 26, 0, 'purchases', 0, 1, 1, 0, 1, 1, 24, 25, 14, 26]+[0, 'sales', 0, 1, 1, 0, 1, 1, 24, 25, 14, 26, 27, 14, 0, 'main', 2, 26, 31]
-                start = [0, 'sales', 0, 'purchases', 0, 'trades', 0, 'world_state', 0, 'eggs_collected', 0, 'dead_sick', 20, 20, 20, 20, 20, 20]
+                start = [0, 'sales', 0, 'purchases', 0, 'trades', 0, 'eggs_collected', 0, 'dead_sick', 0, 'world_state', 20, 20, 20, 20, 20, 20]
                 signal = -2
                 res, acc, state = None, None, None
                 retries = 0
                 while signal == -2:
-                    vm_ = VM(start+end[:-1]+[37, 38, 39, 40, 31])
+                    vm_ = VM(test()+end[:-1]+[37, 38, 39, 40, 31])
                     vm_.analyse()
                     res, state, acc, signal = vm_.execute()
                     if signal == -2:

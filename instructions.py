@@ -447,13 +447,80 @@ def update_cache(stack=None, memory=None, pc=None, analysed=None):
         return None, None, None, None, None
     
     if not cache_state[collection_name]['state']['root_hash']:
+        if collection_name == EVENTC[TRADE]:
+            if not cache_state[EVENTC[SELL]]['state']['root_hash'] or not cache_state[EVENTC[BUY]]['state']['root_hash']:
+                log.warning("sales or purchases don't exist, querying")
+                query = db.collection(EVENTC[SELL]).order_by('submitted_on.unix', direction=firestore.Query.ASCENDING)
+                results = query.stream()
+                for doc in results:
+                    cache_state[EVENTC[SELL]][doc.id] = doc.to_dict()
+                
+                query = db.collection(EVENTC[BUY]).order_by('submitted_on.unix', direction=firestore.Query.ASCENDING)
+                results = query.stream()
+                for doc in results:
+                    cache_state[EVENTC[BUY]][doc.id] = doc.to_dict()
+
+        elif collection_name == EVENTC[SELL] or collection_name == EVENTC[BUY]:
+            if not cache_state[EVENTC[TRADE]]['state']['root_hash']:
+                log.warning("trades should be queried before sales and purchases")
+                return None, None, None, None, None
+
         # no cache exists, proceed with query
         log.info("no cache exists, querying...")
         query = collection_ref.order_by('submitted_on.unix', direction=firestore.Query.ASCENDING)
         results = query.stream()
         cache_state[collection_name]['state'] = state_dict
+        docs_set = set()
         for doc in results:
             cache_state[collection_name][doc.id] = doc.to_dict()
+            if EVENTC[TRADE] == collection_name:
+                if cache_state[collection_name][doc.id]['sale_hash']:
+                    if cache_state[collection_name][doc.id]['sale_hash'] not in cache_state[EVENTC[SELL]]:
+                        log.error(f"A trade doc but no corresponding sale doc, trade hash: {doc.id} sale hash: {cache_state[collection_name][doc.id]['sale_hash']}")
+                        return None, None, None, None, None
+                elif cache_state[collection_name][doc.id]['purchase_hash']:
+                    if cache_state[collection_name][doc.id]['purchase_hash'] not in cache_state[EVENTC[BUY]]:
+                        log.error(f"A trade doc but no corresponding purchase doc, trade hash: {doc.id} purchase hash: {cache_state[collection_name][doc.id]['purchase_hash']}")
+                        return None, None, None, None, None
+            elif EVENTC[SELL] == collection_name:
+                found_match = False
+                for key in cache_state[EVENTC[TRADE]]:
+                    if key == 'state' or key == 'prev_states':
+                        continue
+
+                    if doc.id == cache_state[EVENTC[TRADE]][key]['sale_hash']:
+                        found_match = True
+                        break
+                
+                if not found_match:
+                    log.error(f"A sale doc but no corresponding trade doc, sale hash: {doc.id}")
+                    return None, None, None, None, None
+            
+            elif EVENTC[BUY] == collection_name:
+                found_match = False
+                for key in cache_state[EVENTC[TRADE]]:
+                    if key == 'state' or key == 'prev_states':
+                        continue
+
+                    if doc.id == cache_state[EVENTC[TRADE]][key]['purchase_hash']:
+                        found_match = True
+                        break
+                
+                if not found_match:
+                    log.error(f"A purchase doc but no corresponding trade doc, purchase hash: {doc.id}")
+                    return None, None, None, None, None
+
+            docs_set.add(doc.id)
+
+        if len(set(cache_state[collection_name]['state']['all_tx_hashes'].keys()) - docs_set) != 0 or len(docs_set - set(cache_state[collection_name]['state']['all_tx_hashes'].keys())) != 0:
+            log.warning(f"Found docs in state but not in {collection_name}, {set(cache_state[collection_name]['state']['all_tx_hashes'].keys()) - docs_set}")
+            log.warning(f"Vice Versa, {docs_set - set(cache_state[collection_name]['state']['all_tx_hashes'].keys())}")
+            return None, None, None, None, None
+        
+        if len(set(cache_state['world_state']['main']['all_hashes'][collection_name].keys()) - docs_set) != 0 or len(docs_set - set(cache_state['world_state']['main']['all_hashes'][collection_name].keys())) != 0:
+            log.warning(f"Found docs in world state but not in {collection_name}, {set(cache_state['world_state']['main']['all_hashes'][collection_name].keys()) - docs_set}")
+            log.warning(f"Vice Versa, {docs_set - set(cache_state['world_state']['main']['all_hashes'][collection_name].keys())}")
+            return None, None, None, None, None
         
         if collection_name == EVENTC[TRADE]:
             for user in state_dict['balances']:
@@ -885,6 +952,7 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
                     continue
             
                 tx = cache_state[collection_name][id]
+            
                 if tx['to'] == user:
                     cache_state[collection_name]['state']['balances'][user] += Decimal(str(tx['amount']))
                         
@@ -1992,9 +2060,9 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
                     # if true hashes don't match
                     log.info("Change happened in remote, prev value, rerun signal sent...")
 
-                    db.collection('mutex_lock').document('lock').set({'is_lock_held': 0, 'process_name': ''})
-                    log.info("Lock released!")
-                    return stack, memory, -2, cache_state, cache_accounts
+                    #db.collection('mutex_lock').document('lock').set({'is_lock_held': 0, 'process_name': ''})
+                    #log.info("Lock released!")
+                    #return stack, memory, -2, cache_state, cache_accounts
 
 
         col_ref = db.collection(x)
@@ -2059,7 +2127,8 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
                 break
         
         if continue_outer:
-            continue
+            #continue
+            pass
                     
         doc_ref = tx_ui_col_ref.document(id)
         batch.set(doc_ref, cache_ui_txs[id])
@@ -2588,8 +2657,7 @@ def test():
                     'amount': doc_val['values']['amount'],
                     'by': doc_val['values']['name'],
                     'date': doc_val['submittedOn'].timestamp(),
-                    'reason': '',
-                    'submitted_on': doc_val['submittedOn'].timestamp()
+                    'reason': ''
                 })
                 if not last_instr:
                     last_instr = list(temp_code[-31:])
@@ -2621,8 +2689,7 @@ def test():
                     'amount': doc_val['values']['amount'],
                     'by': doc_val['values']['name'],
                     'date': doc_val['submittedOn'].timestamp(),
-                    'reason': '',
-                    'submitted_on': doc_val['submittedOn'].timestamp()
+                    'reason': ''
                 })
                 temp_code = list(temp_code[18:])
                 if not last_instr:
@@ -2657,8 +2724,7 @@ def test():
                     'amount': float(doc_val['values']['amount']),
                     'by': doc_val['values']['name'],
                     'date': doc_val['values']['date'].timestamp(),
-                    'reason': doc_val['values']['purpose'],
-                    'submitted_on': doc_val['submittedOn'].timestamp()
+                    'reason': doc_val['values']['purpose']
                 })
                 if not last_instr:
                     last_instr = list(temp_code[-31:])
@@ -2691,8 +2757,7 @@ def test():
                     'amount': float(doc_val['values']['amount']),
                     'by': doc_val['values']['name'],
                     'date': doc_val['values']['date'].timestamp(),
-                    'reason': doc_val['values']['purpose'],
-                    'submitted_on': doc_val['submittedOn'].timestamp()
+                    'reason': doc_val['values']['purpose']
                 })
                 temp_code = list(temp_code[18:])
                 if not last_instr:
@@ -2967,6 +3032,22 @@ def test():
     print("total entries", i)
     return code
 
+
+def delete_collection(coll_ref, batch_size=2000):
+    docs = coll_ref.limit(batch_size).stream()
+    deleted = 0
+
+    for doc in docs:
+        if doc.id == 'cleared':
+            continue
+        print(f'Deleting doc {doc.id} => {doc.to_dict()}')
+        doc.reference.delete()
+        deleted = deleted + 1
+
+    if deleted >= batch_size:
+        return delete_collection(coll_ref, batch_size)
+
+#delete_collection(coll_ref=db.collection("tx_ui"))
 
 inst_mapping = {
     str(Opcodes.PUSH.value): push,

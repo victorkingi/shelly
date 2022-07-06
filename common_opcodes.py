@@ -25,9 +25,9 @@ class CommonOps:
             [Opcodes.PUSH.value, 'sales'],
             [Opcodes.PUSH.value, 'purchases'],
             [Opcodes.PUSH.value, 'trades'],
-            [Opcodes.PUSH.value, 'world_state'],
             [Opcodes.PUSH.value, 'eggs_collected'],
             [Opcodes.PUSH.value, 'dead_sick'],
+            [Opcodes.PUSH.value, 'world_state'],
             [Opcodes.UPDATECACHE.value],
             [Opcodes.UPDATECACHE.value],
             [Opcodes.UPDATECACHE.value],
@@ -180,9 +180,9 @@ class CommonOps:
             [Opcodes.PUSH.value, 'sales'],
             [Opcodes.PUSH.value, 'purchases'],
             [Opcodes.PUSH.value, 'trades'],
-            [Opcodes.PUSH.value, 'world_state'],
             [Opcodes.PUSH.value, 'eggs_collected'],
             [Opcodes.PUSH.value, 'dead_sick'],
+            [Opcodes.PUSH.value, 'world_state'],
             [Opcodes.UPDATECACHE.value],
             [Opcodes.UPDATECACHE.value],
             [Opcodes.UPDATECACHE.value],
@@ -291,12 +291,12 @@ class CommonOps:
         }):
     
         instr = [
-            [Opcodes.PUSH.value, 'sales'],
-            [Opcodes.PUSH.value, 'purchases'],
-            [Opcodes.PUSH.value, 'world_state'],
             [Opcodes.PUSH.value, 'eggs_collected'],
             [Opcodes.PUSH.value, 'dead_sick'],
+            [Opcodes.PUSH.value, 'sales'],
+            [Opcodes.PUSH.value, 'purchases'],
             [Opcodes.PUSH.value, 'trades'],
+            [Opcodes.PUSH.value, 'world_state'],
             [Opcodes.UPDATECACHE.value],
             [Opcodes.UPDATECACHE.value],
             [Opcodes.UPDATECACHE.value],
@@ -358,9 +358,9 @@ class CommonOps:
             [Opcodes.PUSH.value, 'sales'],
             [Opcodes.PUSH.value, 'purchases'],
             [Opcodes.PUSH.value, 'trades'],
-            [Opcodes.PUSH.value, 'world_state'],
             [Opcodes.PUSH.value, 'eggs_collected'],
             [Opcodes.PUSH.value, 'dead_sick'],
+            [Opcodes.PUSH.value, 'world_state'],
             [Opcodes.UPDATECACHE.value],
             [Opcodes.UPDATECACHE.value],
             [Opcodes.UPDATECACHE.value],
@@ -421,17 +421,16 @@ class CommonOps:
             'amount': 3000,
             'by': 'PURITY',
             'date': 1654523316,
-            'reason': '',
-            'submitted_on': 1654523316
+            'reason': ''
         }):
     
         instr = [
             [Opcodes.PUSH.value, 'sales'],
             [Opcodes.PUSH.value, 'purchases'],
             [Opcodes.PUSH.value, 'trades'],
-            [Opcodes.PUSH.value, 'world_state'],
             [Opcodes.PUSH.value, 'eggs_collected'],
             [Opcodes.PUSH.value, 'dead_sick'],
+            [Opcodes.PUSH.value, 'world_state'],
             [Opcodes.UPDATECACHE.value],
             [Opcodes.UPDATECACHE.value],
             [Opcodes.UPDATECACHE.value],
