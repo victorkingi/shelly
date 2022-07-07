@@ -335,7 +335,7 @@ class VM:
                             bool_list.append(isinstance(values[0], Decimal)  and values[0] >= EARLIEST_VALID_YEAR and values[0] <= Decimal(f'{time.time()}'))
                             bool_list.append(isinstance(values[1], str))
                             bool_list.append(isinstance(values[2], str))
-                            bool_list.append(isinstance(values[3], str) and not not self.cache_accounts.get(values[3], 0)) # from
+                            bool_list.append(isinstance(values[3], str) and not not self.cache_state[EVENTC[TRADE]]['state']['balances'].get(values[3], 0)) # from
                             bool_list.append(isinstance(values[4], str) and not not values[4]) # to
                             bool_list.append(isinstance(values[5], str))
                             bool_list.append(isinstance(values[6], str))
