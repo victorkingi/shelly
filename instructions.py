@@ -457,7 +457,14 @@ def update_cache(stack=None, memory=None, pc=None, analysed=None):
             }
         }
         map_nested_dicts_modify(cache_state, lambda v: Decimal(f'{v}') if isinstance(v, float) or isinstance(v, int) else v)
-        log.debug("Updated main state")
+        log.info("Updated main state")
+
+        docs = db.collection('tx_ui').stream()
+        for doc in docs:
+            global cache_ui_txs
+            cache_ui_txs[doc.id] = doc.to_dict()
+        log.info("updated tx_ui")
+        
         return stack, memory, pc, cache_state, cache_accounts
 
     state_dict = collection_ref.document('state').get().to_dict()
@@ -1976,11 +1983,18 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
     log.debug(f"{pc}: WRITE")
     pc += 1
 
-    if not sanity_check(cache_state=cache_state):
+    # hashes check should be first as the other checks depend on its return value
+    if not sanity_check_hashes_match(cache_state=cache_state):
         log.error("Sanity check failed, some hashes might be missing")
         return None, None, None, None, None
-    elif not sanity_trays_to_sales_check(cache_state=cache_state):
+    elif not sanity_check_trays_to_sales(cache_state=cache_state):
         log.error("Sanity check failed, a sale is invalid, due to trays used")
+        return None, None, None, None, None
+    elif not sanity_check_all_txs_included(cache_state=cache_state, cache_ui_txs=cache_ui_txs):
+        log.error("Sanity check failed, missing txs in tx_ui or extras available")
+        return None, None, None, None, None
+    elif not sanity_check_ps_to_trade(cache_state=cache_state):
+        log.error("Sanity check failed, a sale or purchase does not have a matching trade")
         return None, None, None, None, None
     else:
         log.info("sanity check passed, proceeding with push...")

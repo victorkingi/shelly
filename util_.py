@@ -11,115 +11,17 @@ import collections.abc
 getcontext().traps[FloatOperation] = True
 TWOPLACES = Decimal(10) ** -2
 
-def sanity_trays_to_sales_check(cache_state):
-    sorted_tuples = sorted(cache_state[EVENTC[SELL]].items(), key=lambda item: item[1]['date']['unix'] if 'date' in item[1] and 'unix' in item[1]['date'] else Decimal(0))
-    cache_state[EVENTC[SELL]] = {k: v for k, v in sorted_tuples}
-    for k, v in cache_state[EVENTC[SELL]].items():
-        if k == 'state' or k == 'prev_states':
-            continue
-        tray_no = v['tray_no']
-        unix_epoch = v['date']['unix']
-        all_trays_sold = [Decimal(v['tray_no']) for k, v in cache_state[EVENTC[SELL]].items() if k != 'state' and k != 'prev_states' and v['date']['unix'] <= unix_epoch]
-        all_trays_collected = [v['trays_collected'] for k, v in cache_state['eggs_collected'].items() if k != 'state' and k != 'prev_states' and v['date']['unix'] <= unix_epoch]
 
-        all_trays_sold = f'{reduce(lambda x, y: x+y, all_trays_sold, Decimal(0))},0'
-        all_trays_collected = reduce(reduce_add_eggs, all_trays_collected, "0,0")
-        remain = get_eggs_diff(all_trays_collected, all_trays_sold)[0]
-        remain = get_eggs_diff(remain, f'{tray_no},0')[1]
+def dup_exists(l):
+    seen = set()
+    dupes = []
 
-        if Decimal(remain) < Decimal(0):
-            return False
-    
-    return True
-
-
-# assert all collections have correct entries
-def sanity_check(cache_state):
-    for k in cache_state:
-        if k == 'world_state':
-            continue
-        
-        id_state_set = set(cache_state[k]['state']['all_tx_hashes'].keys())
-        id_true_state_set = set([v['true_hash'] for _, v in cache_state[k]['state']['all_tx_hashes'].items()])
-
-        id_col_set = set(cache_state[k].keys())
-        id_col_set.remove('state')
-        id_col_set.remove('prev_states')
-
-        id_col_true_set = set()
-        for v in cache_state[k]:
-            if 'true_hash' in cache_state[k][v]:
-                id_col_true_set.add(cache_state[k][v]['true_hash'])
-        
-
-        id_world_set = set(cache_state['world_state']['main']['all_hashes'][k].keys())
-        id_world_true_set = set(cache_state['world_state']['main']['all_hashes'][k].values())
-
-        return (id_state_set == id_col_set == id_world_set) and (id_true_state_set == id_col_true_set == id_world_true_set)
-
-
-def get_true_hash_for_tx(tx, collection_name):
-    tx_data_to_hash = ''
-
-    if collection_name == 'sales':
-        tx_data_to_hash += tx['section'] + str(tx['submitted_on']['unix']) + tx['buyer'] + str(tx['tray_price']) + str(tx['tray_no']) + tx['by'] + str(tx['date']['unix'])
-        
-        if tx['prev_values']:
-            log.debug(f"found prev values dict of size {len(tx['prev_values'].keys())}")
-            for k in tx['prev_values']:
-                prev = tx['prev_values'][k]
-                tx_data_to_hash += prev['section'] + str(prev['submitted_on']['unix']) + prev['buyer'] + str(prev['tray_price']) + str(prev['tray_no']) + prev['by'] + str(prev['date']['unix'])
-
-    elif collection_name == 'purchases':
-        tx_data_to_hash += tx['section'] + str(tx['submitted_on']['unix']) + tx['item_name'] + str(tx['item_price']) + str(tx['item_no']) + tx['by'] + str(tx['date']['unix'])
-        
-        if tx['prev_values']:
-            log.debug(f"found prev values dict of size {len(tx['prev_values'].keys())}")
-            for k in tx['prev_values']:
-                prev = tx['prev_values'][k]
-                tx_data_to_hash += prev['section'] + str(prev['submitted_on']['unix']) + prev['item_name'] + str(prev['item_price']) + str(prev['item_no']) + prev['by'] + str(prev['date']['unix'])
-        
-    elif collection_name == 'trades':
-        tx_data_to_hash += str(tx['amount']) + tx['sale_hash'] + tx['purchase_hash'] + str(tx['submitted_on']['unix']) + tx['from'] + tx['to'] + str(tx['reason']) + tx['by'] + str(tx['date']['unix'])
-        
-        if tx['prev_values']:
-            log.debug(f"found prev values dict of size {len(tx['prev_values'].keys())}")
-            for k in tx['prev_values']:
-                prev = tx['prev_values'][k]
-                tx_data_to_hash += str(prev['amount']) + prev['sale_hash'] + prev['purchase_hash'] + str(prev['submitted_on']['unix']) + prev['from'] + prev['to'] + str(prev['reason']) + prev['by'] + str(prev['date']['unix'])
-        
-    elif collection_name == 'eggs_collected':
-        tx_data_to_hash += str(tx['a1']) + str(tx['a2']) + str(tx['b1']) + str(tx['b2']) + str(tx['c1']) + str(tx['c2']) + str(tx['submitted_on']['unix']) + str(tx['broken']) + str(tx['house']) + tx['trays_collected'] + tx['by'] + str(tx['date']['unix'])
-        
-        if tx['prev_values']:
-            log.debug(f"found prev values dict of size {len(tx['prev_values'].keys())}")
-            for k in tx['prev_values']:
-                prev = tx['prev_values'][k]
-                tx_data_to_hash += str(prev['a1']) + str(prev['a2']) + str(prev['b1']) + str(prev['b2']) + str(prev['c1']) + str(prev['c2']) + str(prev['submitted_on']['unix']) + str(prev['broken']) + str(prev['house']) + prev['trays_collected'] + prev['by'] + str(prev['date']['unix'])
-        
-    elif collection_name == 'dead_sick':
-        tx_data_to_hash += tx['image_id'] + tx['image_url'] + tx['section'] + str(tx['submitted_on']['unix']) + tx['location'] + str(tx['number']) + tx['reason'] + tx['by'] + str(tx['date']['unix'])
-        
-        if tx['prev_values']:
-            log.debug(f"found prev values dict of size {len(tx['prev_values'].keys())}")
-            for k in tx['prev_values']:
-                prev = tx['prev_values'][k]
-                tx_data_to_hash += prev['image_id'] + prev['image_url'] + prev['section'] + str(prev['submitted_on']['unix']) + prev['location'] + str(prev['number']) + prev['reason'] + prev['by'] + str(prev['date']['unix'])
-
-    else:
-        log.error("Invalid collection name provided to true hash function")
-        return None
-    
-    message = f"tx data to hash, {tx_data_to_hash}"
-    message = message[:MAX_CHAR_COUNT_LOG]+"..."  if len(message) > MAX_CHAR_COUNT_LOG else message
-    #log.debug(message)
-
-    def internal_hash(to_hash):
-        m = hashlib.sha256()
-        m.update(to_hash.encode())
-        return m.hexdigest()
-    
-    return internal_hash(tx_data_to_hash)
+    for x in l:
+        if x in seen:
+            dupes.append(x)
+        else:
+            seen.add(x)
+    return dupes
 
 
 def get_eggs_diff(val1, val2):
@@ -274,6 +176,178 @@ def reduce_add_eggs(val1, val2):
     return None
 
 
+
+def sanity_check_trays_to_sales(cache_state):
+    sorted_tuples = sorted(cache_state[EVENTC[SELL]].items(), key=lambda item: item[1]['date']['unix'] if 'date' in item[1] and 'unix' in item[1]['date'] else Decimal(0))
+    cache_state[EVENTC[SELL]] = {k: v for k, v in sorted_tuples}
+    for k, v in cache_state[EVENTC[SELL]].items():
+        if k == 'state' or k == 'prev_states':
+            continue
+        tray_no = v['tray_no']
+        unix_epoch = v['date']['unix']
+        all_trays_sold = [Decimal(v['tray_no']) for k, v in cache_state[EVENTC[SELL]].items() if k != 'state' and k != 'prev_states' and v['date']['unix'] <= unix_epoch]
+        all_trays_collected = [v['trays_collected'] for k, v in cache_state['eggs_collected'].items() if k != 'state' and k != 'prev_states' and v['date']['unix'] <= unix_epoch]
+
+        all_trays_sold = f'{reduce(lambda x, y: x+y, all_trays_sold, Decimal(0))},0'
+        all_trays_collected = reduce(reduce_add_eggs, all_trays_collected, "0,0")
+        remain = get_eggs_diff(all_trays_collected, all_trays_sold)[0]
+        remain = get_eggs_diff(remain, f'{tray_no},0')[1]
+
+        if Decimal(remain) < Decimal(0):
+            return False
+    
+    return True
+
+
+# assert all collections have correct entries
+def sanity_check_hashes_match(cache_state):
+    is_safe = []
+    for k in cache_state:
+        if k == 'world_state':
+            continue
+        
+        # check for duplicates
+        dups = dup_exists(list(cache_state[k]['state']['all_tx_hashes'].keys()))
+        dups_true = dup_exists(list([v['true_hash'] for _, v in cache_state[k]['state']['all_tx_hashes'].items()]))
+        if dups or dups_true:
+            log.error(f"Duplicate entries in state {k}: entry hash: {dups}, true hash: {dups_true}")
+            return False
+        
+        dups = dup_exists(list(cache_state['world_state']['main']['all_hashes'][k].keys()))
+        dups_true = dup_exists(list(cache_state['world_state']['main']['all_hashes'][k].values()))
+        if dups or dups_true:
+            log.error(f"Duplicate entries in world state: entry hash: {dups}, true hash: {dups_true}")
+            return False
+        
+        id_state_set = set(cache_state[k]['state']['all_tx_hashes'].keys())
+        id_true_state_set = set([v['true_hash'] for _, v in cache_state[k]['state']['all_tx_hashes'].items()])
+
+        id_col_set = set(cache_state[k].keys())
+        id_col_set.remove('state')
+        id_col_set.remove('prev_states')
+
+        id_col_true_set = set()
+        id_col_true_list = []
+        for v in cache_state[k]:
+            if v == 'prev_states' or v == 'state':
+                continue
+            id_col_true_set.add(cache_state[k][v]['true_hash'])
+            id_col_true_list.append(cache_state[k][v]['true_hash'])
+        
+        dups = dup_exists(list(cache_state[k].keys()))
+        dups_true = dup_exists(id_col_true_list)
+        if dups or dups_true:
+            log.error(f"Duplicate entries in collection: entry hash: {dups}, true hash: {dups_true}")
+            return False
+
+        id_world_set = set(cache_state['world_state']['main']['all_hashes'][k].keys())
+        id_world_true_set = set(cache_state['world_state']['main']['all_hashes'][k].values())
+
+        is_safe.append((id_state_set == id_col_set == id_world_set) and (id_true_state_set == id_col_true_set == id_world_true_set))
+        
+    return reduce(lambda x, y: x and y, is_safe, True)
+
+
+# assert tx_ui contains only all entries and nothing else
+def sanity_check_all_txs_included(cache_state, cache_ui_txs):
+    all_hashes = []
+    for k in cache_state:
+        if k == 'world_state':
+            continue
+
+        id_world_set = [x for x in cache_state['world_state']['main']['all_hashes'][k]]
+        id_world_true_set = [y for _, y in cache_state['world_state']['main']['all_hashes'][k].items()]
+        all_hashes = [*id_world_set, *id_world_true_set, *all_hashes]
+    
+    tx_ui_hashes = [x for x in cache_ui_txs]
+    tx_ui_hashes = tx_ui_hashes + [v['data']['true_hash'] for _,v in cache_ui_txs.items()]
+    dups = dup_exists(tx_ui_hashes)
+    if dups:
+        log.error(f"Duplicate entries in tx_ui: entry/true hash: {dups}")
+        return False
+
+    return set(tx_ui_hashes) == set(all_hashes)
+
+
+# assert every sale and purchase matches to a trade and vice versa such that no loose entries exist
+def sanity_check_ps_to_trade(cache_state):
+    sale_hashes = set(cache_state[EVENTC[SELL]].keys())
+    purchase_hashes = set(cache_state[EVENTC[BUY]].keys())
+    sp_set = sale_hashes.union(purchase_hashes)
+    trade_sale_hashes = set([v['purchase_hash'] or v['sale_hash'] for k, v in cache_state[EVENTC[TRADE]].items() if k != 'prev_states' and k != 'state'])
+    trade_sale_hashes.remove('')
+    sp_set.remove('state')
+    sp_set.remove('prev_states')
+
+    outlier_trade = trade_sale_hashes - sp_set
+    outlier_sp = sp_set - trade_sale_hashes
+    return outlier_sp == outlier_trade == set()
+
+
+def get_true_hash_for_tx(tx, collection_name):
+    tx_data_to_hash = ''
+
+    if collection_name == 'sales':
+        tx_data_to_hash += tx['section'] + str(tx['submitted_on']['unix']) + tx['buyer'] + str(tx['tray_price']) + str(tx['tray_no']) + tx['by'] + str(tx['date']['unix'])
+        
+        if tx['prev_values']:
+            log.debug(f"found prev values dict of size {len(tx['prev_values'].keys())}")
+            for k in range(len(tx['prev_values'].keys())):
+                prev = tx['prev_values'][str(k)]
+                tx_data_to_hash += prev['section'] + str(prev['submitted_on']['unix']) + prev['buyer'] + str(prev['tray_price']) + str(prev['tray_no']) + prev['by'] + str(prev['date']['unix'])
+
+    elif collection_name == 'purchases':
+        tx_data_to_hash += tx['section'] + str(tx['submitted_on']['unix']) + tx['item_name'] + str(tx['item_price']) + str(tx['item_no']) + tx['by'] + str(tx['date']['unix'])
+        
+        if tx['prev_values']:
+            log.debug(f"found prev values dict of size {len(tx['prev_values'].keys())}")
+            for k in range(len(tx['prev_values'].keys())):
+                prev = tx['prev_values'][str(k)]
+                tx_data_to_hash += prev['section'] + str(prev['submitted_on']['unix']) + prev['item_name'] + str(prev['item_price']) + str(prev['item_no']) + prev['by'] + str(prev['date']['unix'])
+        
+    elif collection_name == 'trades':
+        tx_data_to_hash += str(tx['amount']) + tx['sale_hash'] + tx['purchase_hash'] + str(tx['submitted_on']['unix']) + tx['from'] + tx['to'] + str(tx['reason']) + tx['by'] + str(tx['date']['unix'])
+        
+        if tx['prev_values']:
+            log.debug(f"found prev values dict of size {len(tx['prev_values'].keys())}")
+            for k in range(len(tx['prev_values'].keys())):
+                prev = tx['prev_values'][str(k)]
+                tx_data_to_hash += str(prev['amount']) + prev['sale_hash'] + prev['purchase_hash'] + str(prev['submitted_on']['unix']) + prev['from'] + prev['to'] + str(prev['reason']) + prev['by'] + str(prev['date']['unix'])
+        
+    elif collection_name == 'eggs_collected':
+        tx_data_to_hash += str(tx['a1']) + str(tx['a2']) + str(tx['b1']) + str(tx['b2']) + str(tx['c1']) + str(tx['c2']) + str(tx['submitted_on']['unix']) + str(tx['broken']) + str(tx['house']) + tx['trays_collected'] + tx['by'] + str(tx['date']['unix'])
+        
+        if tx['prev_values']:
+            log.debug(f"found prev values dict of size {len(tx['prev_values'].keys())}")
+            for k in range(len(tx['prev_values'].keys())):
+                prev = tx['prev_values'][str(k)]
+                tx_data_to_hash += str(prev['a1']) + str(prev['a2']) + str(prev['b1']) + str(prev['b2']) + str(prev['c1']) + str(prev['c2']) + str(prev['submitted_on']['unix']) + str(prev['broken']) + str(prev['house']) + prev['trays_collected'] + prev['by'] + str(prev['date']['unix'])
+        
+    elif collection_name == 'dead_sick':
+        tx_data_to_hash += tx['image_id'] + tx['image_url'] + tx['section'] + str(tx['submitted_on']['unix']) + tx['location'] + str(tx['number']) + tx['reason'] + tx['by'] + str(tx['date']['unix'])
+        
+        if tx['prev_values']:
+            log.debug(f"found prev values dict of size {len(tx['prev_values'].keys())}")
+            for k in range(len(tx['prev_values'].keys())):
+                prev = tx['prev_values'][str(k)]
+                tx_data_to_hash += prev['image_id'] + prev['image_url'] + prev['section'] + str(prev['submitted_on']['unix']) + prev['location'] + str(prev['number']) + prev['reason'] + prev['by'] + str(prev['date']['unix'])
+
+    else:
+        log.error("Invalid collection name provided to true hash function")
+        return None
+    
+    message = f"tx data to hash, {tx_data_to_hash}"
+    message = message[:MAX_CHAR_COUNT_LOG]+"..."  if len(message) > MAX_CHAR_COUNT_LOG else message
+    log.debug(message)
+
+    def internal_hash(to_hash):
+        m = hashlib.sha256()
+        m.update(to_hash.encode())
+        return m.hexdigest()
+    
+    return internal_hash(tx_data_to_hash)
+
+
 def map_nested_dicts_modify(ob, func):
     for k, v in ob.items():
         if isinstance(v, collections.abc.Mapping):
@@ -305,6 +379,7 @@ def to_area_chart_dict(x_axis=[], y_axis=[], label=''):
         data['borderColor'].append(rgba_random_generator(alpha=1))
 
     return data
+
 
 # given a date, get laying percent on that day
 def laying_percent_for_a_day(unix_epoch, dead_docs, eggs):
