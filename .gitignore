@@ -137,3 +137,10 @@ crash-*
 slow-unit-*
 rand/
 .vscode/
+state.json
+accounts.json
+ds.json
+eggs_collected.json
+trade.json
+purchases.json
+sales.json
