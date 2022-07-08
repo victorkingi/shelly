@@ -60,6 +60,7 @@ buyers = set((
     'Rose',
     'Gitonyi',
     'Muthomi',
+    'Solomon',
     'forgotjeff'
 ))
 b_upper = map(lambda x: x.upper(), buyers)
