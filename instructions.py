@@ -232,46 +232,46 @@ def stop(stack=None, memory=None, pc=None, analysed=None):
 
     if stack.size() == 1:
         empty_state = {
-            'world_state': {
-                'main': {},
-                'prev_states': {}
-            },
-            'sales': {
-                'state': {
-                    'root_hash': '',
-                    'all_tx_hashes': {}
-                },
-                'prev_states': {}
-            },
-            'purchases': {
-                'state': {
-                    'root_hash': '',
-                    'all_tx_hashes': {}
-                },
-                'prev_states': {}
-            },
-            'eggs_collected': {
-                'state': {
-                    'root_hash': '',
-                    'all_tx_hashes': {}
-                },
-                'prev_states': {}
-            },
-            'dead_sick': {
-            'state': {
-                    'root_hash': '',
-                    'all_tx_hashes': {}
-                },
-                'prev_states': {}
-            },
-            'trades': {
-                'state': {
-                    'root_hash': '',
-                    'all_tx_hashes': {}
-                },
-                'prev_states': {}
-            }
-        }
+    'world_state': {
+        'main': {},
+        'prev_states': {}
+    },
+    'sales': {
+        'state': {
+            'root_hash': '',
+            'all_tx_hashes': {}
+        },
+        'prev_states': {}
+    },
+    'purchases': {
+        'state': {
+            'root_hash': '',
+            'all_tx_hashes': {}
+        },
+        'prev_states': {}
+    },
+    'eggs_collected': {
+        'state': {
+            'root_hash': '',
+            'all_tx_hashes': {}
+        },
+        'prev_states': {}
+    },
+    'dead_sick': {
+       'state': {
+            'root_hash': '',
+            'all_tx_hashes': {}
+        },
+        'prev_states': {}
+    },
+    'trades': {
+        'state': {
+            'root_hash': '',
+            'all_tx_hashes': {}
+        },
+        'prev_states': {}
+    }
+}
         empty_accounts = {'BLACK_HOLE': Decimal(MAX_EMAX), 'ANNE': Decimal(4000) }
 
         if empty_accounts == cache_accounts and empty_state == cache_state:
@@ -649,7 +649,7 @@ def timestamp_now(stack=None, memory=None, pc=None, analysed=None):
     log.debug(f"{pc}: NOW")
     pc += 1
 
-    stack.push(Decimal(f'{time.time()}'))
+    stack.push(Decimal(f'{int(time.time())}'))
     return stack, memory, pc, cache_state, cache_accounts
 
 
@@ -1180,6 +1180,11 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
             cache_state[collection_name]['state']['total_spent'] += amount
             cache_state[collection_name]['state']['total_purchases'] += 1
             cache_state[collection_name]['state']['total_items_bought'] += tx['item_no']
+            paid_purity_last_month = [(v['date']['unix'], v['item_name']) for k, v in cache_state[collection_name].items() if k != 'prev_states' and k != 'state' and v['section'] == 'PPURITY']
+            paid_purity_last_month.sort(reverse=True)
+            last_month = paid_purity_last_month[0][1].split(',')[:-1]
+            last_month = last_month[-1]
+            cache_state[collection_name]['state']['paid_purity_last_month'] = last_month
             section = 'section'
 
             cache_state[collection_name]['state'][f'total_spent_{tx[section].lower()[1:] if tx[section].lower()[1:] == other else tx[section].lower()}'] += amount

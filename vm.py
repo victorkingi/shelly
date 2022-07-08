@@ -223,11 +223,45 @@ class VM:
                                     log.warning(f"Invalid feeds item provided, {values[5]}")
                                     return False
                                 
-                                if values[7] in ["PURITY"]:
+                                if values[7] in ["PPURITY"]:
                                     is_valid_month = re.search("^([A-Z]{3},)+$", values[5])
 
                                     if not is_valid_month:
                                         log.warning(f"Invalid payment months for Purity provided, {values[5]}")
+                                        return False
+
+                                    if 'paid_purity_last_month' in self.cache_state[EVENTC[BUY]]['state']:
+                                        is_valid_last_month = re.search("^[A-Z]{3}$", self.cache_state[EVENTC[BUY]]['state']['paid_purity_last_month'])
+                                        if is_valid_last_month:
+                                            months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC' ]
+                                            my_months = []
+                                            entered_months = values[5].split(',')[:-1] # i.e. ['JUN', 'JUL', 'AUG']
+                                            last_month = self.cache_state[EVENTC[BUY]]['state']['paid_purity_last_month']
+                                            is_entered_safe = [x for x in entered_months if x in months]
+                                            if is_entered_safe != entered_months:
+                                                log.error(f"Entered months not safe, got {is_entered_safe} from {entered_months}")
+                                                return False
+                                            is_first_safe = entered_months[0] == months[(months.index(last_month)+1)]
+
+                                            if is_first_safe:
+                                                for i, x in enumerate(entered_months):
+                                                    if i == 0:
+                                                        my_months.append(months.index(x))
+                                                    else:
+                                                        expected = months[(my_months[-1]+1)]
+                                                        if expected != x:
+                                                            log.error(f"Invalid month ordering for paid purity got, {x} but wanted {expected}")
+                                                            return False
+                                                        my_months.append(months.index(x))
+                                                log.debug(f"entered paid purity months {entered_months}")
+                                            else:
+                                                log.error(f"first entry month not correct, {entered_months[0]} expected {months[(months.index(last_month)+1)%len(months)]}")
+                                                return False
+                                        else:
+                                            log.error(f"regex eval failed, string {self.cache_state[EVENTC[BUY]]['state']['paid_purity_last_month']}")
+                                            return False             
+                                    else:
+                                        log.error("Paid purity field does not exist")
                                         return False
                                 
                                 return True

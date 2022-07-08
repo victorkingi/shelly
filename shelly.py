@@ -1,7 +1,6 @@
 from lexer import run
 from compiler import Compiler
 from vm import VM
-import sys
 from decimal import *
 from log_ import fh
 from common_opcodes import *
