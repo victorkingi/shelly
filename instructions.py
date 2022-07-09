@@ -97,21 +97,18 @@ def check():
             for tx in txs:
                 if 'toAddress' in tx:
                     if tx['fromAddress'] in users or tx['toAddress'] in users:
-                        if users.get(tx['fromAddress'], 'nil') == 'BANK':
+                        if users.get(tx['fromAddress'], 'nil') == 'VICTOR':
                             TX = tx
                             print("am:", tx['amount'], "from", users.get(tx['fromAddress'], 'nil'), 'to', users.get(tx['toAddress'], 'nil'))
                             bal -= Decimal(str(tx['amount']))
-                        if users.get(tx['toAddress'], 'nil') == 'BANK':
+                        if users.get(tx['toAddress'], 'nil') == 'VICTOR':
                             print("am:", tx['amount'], "from", users.get(tx['fromAddress'], 'nil'), 'to', users.get(tx['toAddress'], 'nil'))
                             TX = tx
                             bal += Decimal(str(tx['amount']))
 
-    print(TX) 
+    print("fin", TX) 
     print(bal)
     # all sales so far by dad, trades not included print((2900*2)+(5*290*12)+2900+(43*300)+(20*300)+(8*290)+(40*300)+(6*290)+(13*290)+(5*300*4)+(9*310)+(2*300)+(8*300)+(12*310))
-
-#check()
-
 
 
 

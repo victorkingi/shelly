@@ -9,8 +9,10 @@ from instructions import test
 import json
 
 
-if __name__ == '__main__':
+def main():
     while True:
+        print("################ Welcome to shelly console ##########################")
+        print("type :q to exit")
         text = input('basic > ')
         if text == ':q':
             break
@@ -52,7 +54,10 @@ if __name__ == '__main__':
                     with open("accounts.json", "w") as outfile:
                         json.dump(acc, outfile)
                     print("execution success")
-
     
     fh.close()
     print("file closed")
+
+
+if __name__ == '__main__':
+    main()
