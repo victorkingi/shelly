@@ -19,7 +19,6 @@ from common_opcodes import CommonOps
 
 getcontext().traps[FloatOperation] = True
 TWOPLACES = Decimal(10) ** -2
-CREDENTIALS = "poultry101-6b1ed-firebase-adminsdk-4h0rk-4b8268dd31.json"
 
 cred = credentials.Certificate(CREDENTIALS)
 firebase_admin.initialize_app(cred)
@@ -3090,14 +3089,15 @@ def delete_collection(coll_ref, batch_size=2000):
         if 'weirdName' in vals:
             print("Weird name", vals)
             continue
-        print(f'Deleting doc {doc.id} => {vals}')
+        print(f'Deleting doc {doc.id} =>')
         doc.reference.delete()
         deleted = deleted + 1
 
     if deleted >= batch_size:
         return delete_collection(coll_ref, batch_size)
 
-#delete_collection(coll_ref=db.collection("pending_transactions"))
+#for x in ["accounts", 'dashboard_data', 'dead_sick', 'eggs_collected', 'mutex_lock', 'purchases', 'sales', 'trades', 'verification_data', 'world_state']:
+    #delete_collection(coll_ref=db.collection(x))
 #delete_collection(coll_ref=db.collection("pend_eggs_collected"))
 
 inst_mapping = {

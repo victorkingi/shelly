@@ -6,10 +6,13 @@ from log_ import fh
 from common_opcodes import *
 from util_ import map_nested_dicts_modify
 from instructions import test
+from constants import CREDENTIALS
 import json
 
 
 def main():
+    if CREDENTIALS[:7] == 'core101':
+        print("######################################################################### TESTING MODE ######################################################################")
     print("################ Welcome to shelly console ##########################")
     print("type :q to exit")
     while True:

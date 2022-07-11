@@ -8,6 +8,8 @@ other = 'other'
 eggs_in_tray = Decimal(30)
 starting_birds_no = Decimal(500)
 
+CREDENTIALS = "core101-3afde-firebase-adminsdk-sxm20-194a475b51.json"
+
 # DIGITS
 
 DIGITS = '0123456789'
