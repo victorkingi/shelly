@@ -74,15 +74,15 @@ cache_deleted = {} # no need to keep track of this as entries are only dumped in
 cache_ui_txs = {}
 cache_verification_data = {}
 cache_dashboard_data = {}
-NAME = 'PURITY'
+NAME = 'JEFF'
 
 def get_tx():
-    results = db.collection('sales').where("date.unix", ">=", 1648425600).stream()
+    results = db.collection('sales').where("date.unix", ">=", 1651968000).stream()
     total = 0
     for doc in results:
         vals = doc.to_dict()
         if vals['by'] == NAME:
-            if vals['buyer'] != 'DUKA':
+            if vals['buyer'] != 'DUKA' and vals['buyer'] != 'THIKAFARMERS':
                 print(doc.id[:5], vals['buyer'])
                 print("amount", vals['tray_no'] * vals['tray_price'])
                 total += vals['tray_no'] * vals['tray_price']
