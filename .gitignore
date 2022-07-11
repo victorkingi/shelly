@@ -144,3 +144,4 @@ eggs_collected.json
 trade.json
 purchases.json
 sales.json
+purge.py

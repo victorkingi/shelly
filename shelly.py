@@ -10,9 +10,9 @@ import json
 
 
 def main():
+    print("################ Welcome to shelly console ##########################")
+    print("type :q to exit")
     while True:
-        print("################ Welcome to shelly console ##########################")
-        print("type :q to exit")
         text = input('basic > ')
         if text == ':q':
             break

@@ -74,6 +74,19 @@ cache_deleted = {} # no need to keep track of this as entries are only dumped in
 cache_ui_txs = {}
 cache_verification_data = {}
 cache_dashboard_data = {}
+NAME = 'PURITY'
+
+def get_tx():
+    results = db.collection('sales').where("date.unix", ">=", 1648425600).stream()
+    total = 0
+    for doc in results:
+        vals = doc.to_dict()
+        if vals['by'] == NAME:
+            if vals['buyer'] != 'DUKA':
+                print(doc.id[:5], vals['buyer'])
+                print("amount", vals['tray_no'] * vals['tray_price'])
+                total += vals['tray_no'] * vals['tray_price']
+    print("final", total)
 
 def check():
     users = {
@@ -97,11 +110,11 @@ def check():
             for tx in txs:
                 if 'toAddress' in tx:
                     if tx['fromAddress'] in users or tx['toAddress'] in users:
-                        if users.get(tx['fromAddress'], 'nil') == 'VICTOR':
+                        if users.get(tx['fromAddress'], 'nil') == NAME:
                             TX = tx
                             print("am:", tx['amount'], "from", users.get(tx['fromAddress'], 'nil'), 'to', users.get(tx['toAddress'], 'nil'))
                             bal -= Decimal(str(tx['amount']))
-                        if users.get(tx['toAddress'], 'nil') == 'VICTOR':
+                        if users.get(tx['toAddress'], 'nil') == NAME:
                             print("am:", tx['amount'], "from", users.get(tx['fromAddress'], 'nil'), 'to', users.get(tx['toAddress'], 'nil'))
                             TX = tx
                             bal += Decimal(str(tx['amount']))
@@ -110,7 +123,8 @@ def check():
     print(bal)
     # all sales so far by dad, trades not included print((2900*2)+(5*290*12)+2900+(43*300)+(20*300)+(8*290)+(40*300)+(6*290)+(13*290)+(5*300*4)+(9*310)+(2*300)+(8*300)+(12*310))
 
-
+#check()
+#get_tx()
 
 def push(elem=None, stack=None, memory=None, pc=None, analysed=None):
     prev_type = type(elem)
@@ -541,10 +555,12 @@ def update_cache(stack=None, memory=None, pc=None, analysed=None):
                     if cache_state[collection_name][doc.id]['sale_hash'] not in cache_state[EVENTC[SELL]]:
                         log.error(f"A trade doc but no corresponding sale doc, trade hash: {doc.id} sale hash: {cache_state[collection_name][doc.id]['sale_hash']}")
                         return None, None, None, None, None
+
                 elif cache_state[collection_name][doc.id]['purchase_hash']:
                     if cache_state[collection_name][doc.id]['purchase_hash'] not in cache_state[EVENTC[BUY]]:
                         log.error(f"A trade doc but no corresponding purchase doc, trade hash: {doc.id} purchase hash: {cache_state[collection_name][doc.id]['purchase_hash']}")
                         return None, None, None, None, None
+
             elif EVENTC[SELL] == collection_name:
                 found_match = False
                 for key in cache_state[EVENTC[TRADE]]:
@@ -1006,7 +1022,9 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
                 cache_state[collection_name]['state']['balances'][user] = Decimal(MAX_EMAX)
                 continue
             elif user == 'ANNE':
-                cache_state[collection_name]['state']['balances'][user] = Decimal(4000)
+                cache_state[collection_name]['state']['balances'][user] = Decimal(4800)
+            elif user == 'VICTOR':
+                cache_state[collection_name]['state']['balances'][user] = Decimal(11600)
             else:
                 cache_state[collection_name]['state']['balances'][user] = Decimal(0) # initialise all
 
@@ -2025,13 +2043,13 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
     pc += 1
 
     # hashes check should be first as the other checks depend on its return value
-    if not sanity_check_hashes_match(cache_state=cache_state):
+    if not sanity_check_hashes_match(cache_state=cache_state, db=db):
         log.error("Sanity check failed, some hashes might be missing")
         return None, None, None, None, None
     elif not sanity_check_trays_to_sales(cache_state=cache_state):
         log.error("Sanity check failed, a sale is invalid, due to trays used")
         return None, None, None, None, None
-    elif not sanity_check_all_txs_included(cache_state=cache_state, cache_ui_txs=cache_ui_txs):
+    elif not sanity_check_all_txs_included(cache_state=cache_state, cache_ui_txs=cache_ui_txs, db=db):
         log.error("Sanity check failed, missing txs in tx_ui or extras available")
         return None, None, None, None, None
     elif not sanity_check_ps_to_trade(cache_state=cache_state):
@@ -2733,7 +2751,7 @@ def test():
                     'amount': doc_val['values']['amount'],
                     'by': doc_val['values']['initiator'],
                     'date': doc_val['submittedOn'].timestamp(),
-                    'reason': 'CATCHUPWITHPREVIOUSDATA'
+                    'reason': ''
                 })
                 if not last_instr:
                     last_instr = list(temp_code[-31:])
@@ -2765,7 +2783,7 @@ def test():
                     'amount': doc_val['values']['amount'],
                     'by': doc_val['values']['initiator'],
                     'date': doc_val['submittedOn'].timestamp(),
-                    'reason': 'CATCHUPWITHPREVIOUSDATA'
+                    'reason': ''
                 })
                 temp_code = list(temp_code[18:])
                 if not last_instr:
@@ -3035,7 +3053,7 @@ def test():
                 'broken': doc_val['broken'],
                 'trays_collected': doc_val['trays_store'],
                 'by': doc_val['submittedBy'],
-                'date': doc_val['date_'], # in milliseconds
+                'date': doc_val['date_'] / 1000, # in milliseconds
                 'submitted_on': doc_val['submittedOn'].timestamp(),
             })
             if not last_instr:
@@ -3073,7 +3091,7 @@ def test():
                 'broken': doc_val['broken'],
                 'trays_collected': doc_val['trays_store'],
                 'by': doc_val['submittedBy'],
-                'date': doc_val['date_'], # in milliseconds
+                'date': doc_val['date_']  / 1000, # in milliseconds
                 'submitted_on': doc_val['submittedOn'].timestamp(),
             })
             temp_code = list(temp_code[18:])
@@ -3108,6 +3126,7 @@ def test():
     print("total entries", i)
     return code
 
+#test()
 
 def delete_collection(coll_ref, batch_size=2000):
     docs = coll_ref.limit(batch_size).stream()

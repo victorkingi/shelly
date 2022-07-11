@@ -200,7 +200,7 @@ def sanity_check_trays_to_sales(cache_state):
 
 
 # assert all collections have correct entries
-def sanity_check_hashes_match(cache_state):
+def sanity_check_hashes_match(cache_state, db):
     is_safe = []
     for k in cache_state:
         if k == 'world_state':
@@ -210,6 +210,36 @@ def sanity_check_hashes_match(cache_state):
         dups = dup_exists(list(cache_state[k]['state']['all_tx_hashes'].keys()))
         dups_true = dup_exists(list([v['true_hash'] for _, v in cache_state[k]['state']['all_tx_hashes'].items()]))
         if dups or dups_true:
+            print(k)
+            for l in set(dups_true):
+                id = [b for b, n in cache_state[k]['state']['all_tx_hashes'].items() if n['true_hash'] == l]
+                doc = db.collection(k).document(id[0]).get()
+                doc2 = db.collection(k).document(id[1]).get()
+                def internal_hash(to_hash):
+                    m = hashlib.sha256()
+                    m.update(to_hash.encode())
+                    return m.hexdigest()
+                def get_hash():
+                    if k == 'trades':
+                        return internal_hash(str(int(doc2.to_dict()['date']['unix']))+doc.to_dict()['from']+doc.to_dict()['to']+doc.to_dict()['purchase_hash']+doc.to_dict()['sale_hash']+str(int(doc.to_dict()['amount']))), internal_hash(str(float(doc2.to_dict()['date']['unix']))+doc.to_dict()['from']+doc.to_dict()['to']+doc.to_dict()['purchase_hash']+doc.to_dict()['sale_hash']+str(float(doc.to_dict()['amount'])))
+                print(id)
+                if get_hash()[0] in id:
+                    print("removing", get_hash()[0])
+                elif get_hash()[1] in id:
+                    print("removing", get_hash()[1])
+
+                '''
+                db.collection(k).document(internal_hash(str(doc.to_dict()['date']['unix']))).delete()
+                del cache_state[k]['state']['all_tx_hashes'][internal_hash(str(doc.to_dict()['date']['unix']))]
+                del cache_state['world_state']['main']['all_hashes'][k][internal_hash(str(doc.to_dict()['date']['unix']))]
+                db.collection(k).document('state').update({
+                    'all_tx_hashes': cache_state[k]['state']['all_tx_hashes']
+                })
+                db.collection('world_state').document('main').update({
+                    f'all_hashes.{k}': cache_state['world_state']['main']['all_hashes'][k]
+                })
+                '''
+
             log.error(f"Duplicate entries in state {k}: entry hash: {dups}, true hash: {dups_true}")
             return False
         
@@ -249,7 +279,7 @@ def sanity_check_hashes_match(cache_state):
 
 
 # assert tx_ui contains only all entries and nothing else
-def sanity_check_all_txs_included(cache_state, cache_ui_txs):
+def sanity_check_all_txs_included(cache_state, cache_ui_txs, db):
     all_hashes = []
     for k in cache_state:
         if k == 'world_state':
@@ -286,6 +316,8 @@ def sanity_check_ps_to_trade(cache_state):
 
 def get_true_hash_for_tx(tx, collection_name):
     tx_data_to_hash = ''
+    tx = dict(tx)
+    map_nested_dicts_modify(tx, lambda x: int(x) if isinstance(x, Decimal) or isinstance(x, float) else x)
 
     if collection_name == 'sales':
         tx_data_to_hash += tx['section'] + str(tx['submitted_on']['unix']) + tx['buyer'] + str(tx['tray_price']) + str(tx['tray_no']) + tx['by'] + str(tx['date']['unix'])

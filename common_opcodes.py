@@ -463,7 +463,7 @@ class CommonOps:
             [Opcodes.INCRBAL.value],
             # TODO Bug: figure out why pushing submitted_on instead of NOW causes a balance difference in cache_state['trades']['state]['balances'] and cache_accounts
             [Opcodes.PUSH.value, values['reason']],
-            [Opcodes.NOW.value],
+            [Opcodes.PUSH.value, values['date']],
             [Opcodes.PUSH.value, values['amount']],
             [Opcodes.PUSH.value, ''],
             [Opcodes.PUSH.value, ''],
@@ -471,11 +471,11 @@ class CommonOps:
             [Opcodes.PUSH.value, values['from']],
             [Opcodes.PUSH.value, 5],
             [Opcodes.DUP.value],
-            [Opcodes.NOW.value],
+            [Opcodes.PUSH.value, values['date']],
             [Opcodes.PUSH.value, 6],
             [Opcodes.SHA256.value],
             [Opcodes.PUSH.value, values['by']],
-            [Opcodes.NOW.value],
+            [Opcodes.PUSH.value, values['date']],
             [Opcodes.PUSH.value, 'TRADE'],
             [Opcodes.CENTRY.value],
 
