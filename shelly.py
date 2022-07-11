@@ -1,5 +1,6 @@
 from lexer import run
 from compiler import Compiler
+from test_data import create_instr
 from vm import VM
 from decimal import *
 from log_ import fh
@@ -38,7 +39,7 @@ def main():
                 res, acc, state = None, None, None
                 retries = 0
                 while signal == -2:
-                    vm_ = VM(start+end[:-1]+[37, 38, 39, 40, 31])
+                    vm_ = VM(create_instr('trade')+end[:-1]+[37, 38, 39, 40, 31])
                     vm_.analyse()
                     res, state, acc, signal = vm_.execute()
                     if signal == -2:
