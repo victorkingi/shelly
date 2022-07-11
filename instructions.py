@@ -546,9 +546,13 @@ def update_cache(stack=None, memory=None, pc=None, analysed=None):
             log.warning(f"Vice Versa, {docs_set - set(cache_state[collection_name]['state']['all_tx_hashes'].keys())}")
             return None, None, None, None, None
         
-        if len(set(cache_state['world_state']['main']['all_hashes'][collection_name].keys()) - docs_set) != 0 or len(docs_set - set(cache_state['world_state']['main']['all_hashes'][collection_name].keys())) != 0:
-            log.warning(f"Found docs in world state but not in {collection_name}, {set(cache_state['world_state']['main']['all_hashes'][collection_name].keys()) - docs_set}")
-            log.warning(f"Vice Versa, {docs_set - set(cache_state['world_state']['main']['all_hashes'][collection_name].keys())}")
+        if 'all_hashes' in cache_state['world_state']['main']:
+            if len(set(cache_state['world_state']['main']['all_hashes'][collection_name].keys()) - docs_set) != 0 or len(docs_set - set(cache_state['world_state']['main']['all_hashes'][collection_name].keys())) != 0:
+                log.warning(f"Found docs in world state but not in {collection_name}, {set(cache_state['world_state']['main']['all_hashes'][collection_name].keys()) - docs_set}")
+                log.warning(f"Vice Versa, {docs_set - set(cache_state['world_state']['main']['all_hashes'][collection_name].keys())}")
+                return None, None, None, None, None
+        else:
+            log.error("All hashes not present in world state main")
             return None, None, None, None, None
         
         if collection_name == EVENTC[TRADE]:
