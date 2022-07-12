@@ -73,6 +73,58 @@ cache_ui_txs = {}
 cache_verification_data = {}
 cache_dashboard_data = {}
 
+NAME = 'JEFF'
+
+def get_tx():
+    results = db.collection('sales').where("date.unix", ">=", 1651968000).stream()
+    total = 0
+    for doc in results:
+        vals = doc.to_dict()
+        if vals['by'] == NAME or True:
+            if vals['buyer'] == 'DUKA':
+                print(doc.id[:5], vals['buyer'])
+                print("amount", vals['tray_no'] * vals['tray_price'])
+                total += vals['tray_no'] * vals['tray_price']
+    print("final", total)
+
+def check():
+    users = {
+        '04d08c83bedef01c48c80c7d8bc4caceb102f32eec4a423136b16b2c5049951884abedcdfdeaf8f9413a7b61e9c607793eacafa7287200cef45f9a4cb4320dd390': 'BABRA',
+        '045371c35c8460a5ee16746ae46a29ac03a2eef67da5985377f34491edede0b654c508c851aeded107d7de7d560c21ac759dd547a289fd097ecad5f718c2edcfef': 'VICTOR',
+        '043139f6bc7808ece9e00aacd80d5d707406c798a35385105ae72b4404d8281cb2f18423a10e65f8569807ee71d53c8fab08cb5e08fb2813b81cbef6294a7181c6': 'JEFF',
+        '04ec74ad5144caefdba5820504a244b1456fdc3bf1031cbe77fc703f61294b42dcce3abe93ff94789d0b65c9b80d667da0708f99f057624e8a8ca64c8272fe66d7': 'PURITY',
+        '04fe89d8d08732b07a5be4d0da407019e0a372f119c0979b6a0890da41a02c913d2df5c97c60e63b3220e030901a95cc75988cbf39b9b857e718b4684ba6948a58': 'ANNE',
+        '04b6f2ef91fbba1e3939724568964c273914d525d4c39c4f6c0af9356df300c6a5cefca80bc9b2010ed79fe7f58b65f2cf27bdadc60c4ddec59555e202da15a461': 'BANK',
+    }
+    query = db.collection('blockchain').order_by("minedOn", direction=firestore.Query.ASCENDING)
+    results = query.get()
+    bal = Decimal(0)
+    TX = {}
+
+    for doc in results:
+        chain = doc.to_dict()
+        chain = chain['chain']
+        for block in chain:
+            txs = block['transactions']
+            for tx in txs:
+                if 'toAddress' in tx:
+                    if tx['fromAddress'] in users or tx['toAddress'] in users:
+                        if users.get(tx['fromAddress'], 'nil') == NAME:
+                            TX = tx
+                            print("am:", tx['amount'], "from", users.get(tx['fromAddress'], 'nil'), 'to', users.get(tx['toAddress'], 'nil'))
+                            bal -= Decimal(str(tx['amount']))
+                        if users.get(tx['toAddress'], 'nil') == NAME:
+                            print("am:", tx['amount'], "from", users.get(tx['fromAddress'], 'nil'), 'to', users.get(tx['toAddress'], 'nil'))
+                            TX = tx
+                            bal += Decimal(str(tx['amount']))
+
+    print("fin", TX) 
+    print(bal)
+    # all sales so far by dad, trades not included print((2900*2)+(5*290*12)+2900+(43*300)+(20*300)+(8*290)+(40*300)+(6*290)+(13*290)+(5*300*4)+(9*310)+(2*300)+(8*300)+(12*310))
+
+#check()
+#get_tx()
+
 
 def push(elem=None, stack=None, memory=None, pc=None, analysed=None):
     prev_type = type(elem)

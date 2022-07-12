@@ -433,8 +433,13 @@ class VM:
                     if not is_valid_hash:
                         log.warning(f"Invalid hash provided for root hash, {self.stack.peek()}")
                         return False
+                    
+                    if 'col_roots' not in self.cache_state['world_state']['main']:
+                        log.warning("col_roots not present in world state main")
+                        return False
 
                     return self.stack.size() > 1 and isinstance(self.stack.peek2(), str) and (self.stack.peek2() in EVENTC.values() or self.stack.peek2() == 'main')
+                return False
             case Opcodes.CALCMAINSTATE.value:
                 total_earned_exists = ['total_earned' in v for k in self.cache_state for _k, v in self.cache_state[k].items() if EVENTC[SELL] == k and 'state' == _k]
                 total_spent_exists = ['total_spent' in v for k in self.cache_state for _k, v in self.cache_state[k].items() if EVENTC[BUY] == k and 'state' == _k]
