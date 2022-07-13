@@ -1857,6 +1857,7 @@ def update_ui_entries(stack=None, memory=None, pc=None, analysed=None):
                 'type': type,
                 'data': cache_state[col_name][hash]
             }
+           
     logging_wrapper_info(f"UI transactions updated")
 
     return stack, memory, pc, cache_state, cache_accounts
