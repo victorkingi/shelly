@@ -1,16 +1,17 @@
 # Virtual Machine
 from functools import reduce
 from decimal import *
+import imp
 import re
 import os
 import time
 import uuid
 
 from opcodes import Opcodes
-from log_ import log
 from stack import Stack
 from instructions import inst_mapping
 from constants import *
+from util_ import logging_wrapper_debug, logging_wrapper_error, logging_wrapper_info, logging_wrapper_warn
 
 EARLIEST_VALID_YEAR = 1577836800 # unix epoch of earliest reasonable data date which is 1st january midnight 2020
 
@@ -50,7 +51,7 @@ class VM:
             else:
                 k += 1
         if len(jumpif_list) != len(jumpdest_list):
-            log.warning("Analysing jump instructions failed")
+            logging_wrapper_warn("Analysing jump instructions failed")
             return
         
         self.analysed_code = {str(jumpif_list[i]): jumpdest_list[i] for i in range(len(jumpif_list))}
@@ -127,7 +128,7 @@ class VM:
             case Opcodes.CENTRY.value:
                 first_check = self.stack.size() > 0 and isinstance(self.stack.peek(), str)
                 if not first_check:
-                    log.warning(f"stack size is 0: {self.stack.size()} or entry name is not a string")
+                    logging_wrapper_warn(f"stack size is 0: {self.stack.size()} or entry name is not a string")
                     return False
                 
                 entry_name = self.stack.peek()
@@ -149,7 +150,7 @@ class VM:
                             bool_list.append(isinstance(values[6], Decimal) and values[6] >= EARLIEST_VALID_YEAR and values[6] <= Decimal(f'{time.time()}'))
                             bool_list.append(isinstance(values[7], str))
                             
-                            log.debug(f"bool type list: {bool_list}")
+                            logging_wrapper_debug(f"bool type list: {bool_list}")
                             res = reduce(lambda a, b: a and b, bool_list)
                             
                             if isinstance(res, bool) and res:
@@ -158,32 +159,32 @@ class VM:
                                 is_valid_hash = re.search("^[a-f0-9]{64}$", to_check_hash)
 
                                 if not is_valid_hash:
-                                    log.warning(f"Invalid hash provided, {to_check_hash}")
+                                    logging_wrapper_warn(f"Invalid hash provided, {to_check_hash}")
                                     return False
                                 
                                 # check if valid section
                                 if values[7] not in VALID_SELL_SECTIONS:
-                                    log.warning(f"Invalid section provided, {values[7]}")
+                                    logging_wrapper_warn(f"Invalid section provided, {values[7]}")
                                     return False
                                 
                                 # check if valid buyer
                                 if values[5] not in VALID_BUYERS and values[7] == "OTHER":
-                                    log.warning(f"Invalid buyer name provided, {values[5]}")
+                                    logging_wrapper_warn(f"Invalid buyer name provided, {values[5]}")
                                     return False
                                 
                                 if values[7] in ["THIKAFARMERS", "CAKES", "DUKA"] and values[5] != values[7]:
                                     for idx, x in enumerate(self.stack.get_stack()):
                                         if x == values[5]:
                                             self.stack.replace(idx, values[7])
-                                            log.warning(f"Buyer name updated to, {values[7]}")
+                                            logging_wrapper_warn(f"Buyer name updated to, {values[7]}")
                                             break
 
                                 return True
                             else:
-                                log.warning(f"reduced bool list not True but {res} of type {type(res)}")
+                                logging_wrapper_warn(f"reduced bool list not True but {res} of type {type(res)}")
                                 return False
 
-                        log.warning(f"stack size not 9 or greater but {self.stack.size()}")
+                        logging_wrapper_warn(f"stack size not 9 or greater but {self.stack.size()}")
                         return False
                     case 'BUY':
                         if self.stack.size() >= 9:
@@ -202,7 +203,7 @@ class VM:
                             bool_list.append(isinstance(values[6], Decimal)  and values[6] >= EARLIEST_VALID_YEAR and values[6] <= Decimal(f'{time.time()}'))
                             bool_list.append(isinstance(values[7], str))
                             
-                            log.debug(f"bool type list: {bool_list}")
+                            logging_wrapper_debug(f"bool type list: {bool_list}")
                             res = reduce(lambda a, b: a and b, bool_list)
 
                             if isinstance(res, bool) and res:
@@ -211,23 +212,23 @@ class VM:
                                 is_valid_hash = re.search("^[a-f0-9]{64}$", to_check_hash)
 
                                 if not is_valid_hash:
-                                    log.warning(f"Invalid hash provided, {to_check_hash}")
+                                    logging_wrapper_warn(f"Invalid hash provided, {to_check_hash}")
                                     return False
                                 
                                 # check if valid section
                                 if values[7] not in VALID_BUY_SECTIONS:
-                                    log.warning(f"Invalid section provided, {values[7]}")
+                                    logging_wrapper_warn(f"Invalid section provided, {values[7]}")
                                     return False
                                 
                                 if values[7] == "FEEDS" and values[5] not in ["LAYERS", "CHICK"]:
-                                    log.warning(f"Invalid feeds item provided, {values[5]}")
+                                    logging_wrapper_warn(f"Invalid feeds item provided, {values[5]}")
                                     return False
                                 
                                 if values[7] in ["PPURITY"]:
                                     is_valid_month = re.search("^([A-Z]{3},)+$", values[5])
 
                                     if not is_valid_month:
-                                        log.warning(f"Invalid payment months for Purity provided, {values[5]}")
+                                        logging_wrapper_warn(f"Invalid payment months for Purity provided, {values[5]}")
                                         return False
 
                                     if 'paid_purity_last_month' in self.cache_state[EVENTC[BUY]]['state']:
@@ -239,7 +240,7 @@ class VM:
                                             last_month = self.cache_state[EVENTC[BUY]]['state']['paid_purity_last_month']
                                             is_entered_safe = [x for x in entered_months if x in months]
                                             if is_entered_safe != entered_months:
-                                                log.error(f"Entered months not safe, got {is_entered_safe} from {entered_months}")
+                                                logging_wrapper_error(f"Entered months not safe, got {is_entered_safe} from {entered_months}")
                                                 return False
                                             is_first_safe = entered_months[0] == months[(months.index(last_month)+1)]
 
@@ -250,26 +251,26 @@ class VM:
                                                     else:
                                                         expected = months[(my_months[-1]+1)]
                                                         if expected != x:
-                                                            log.error(f"Invalid month ordering for paid purity got, {x} but wanted {expected}")
+                                                            logging_wrapper_error(f"Invalid month ordering for paid purity got, {x} but wanted {expected}")
                                                             return False
                                                         my_months.append(months.index(x))
-                                                log.debug(f"entered paid purity months {entered_months}")
+                                                logging_wrapper_debug(f"entered paid purity months {entered_months}")
                                             else:
-                                                log.error(f"first entry month not correct, {entered_months[0]} expected {months[(months.index(last_month)+1)%len(months)]}")
+                                                logging_wrapper_error(f"first entry month not correct, {entered_months[0]} expected {months[(months.index(last_month)+1)%len(months)]}")
                                                 return False
                                         else:
-                                            log.error(f"regex eval failed, string {self.cache_state[EVENTC[BUY]]['state']['paid_purity_last_month']}")
+                                            logging_wrapper_error(f"regex eval failed, string {self.cache_state[EVENTC[BUY]]['state']['paid_purity_last_month']}")
                                             return False             
                                     else:
-                                        log.error("Paid purity field does not exist")
+                                        logging_wrapper_error("Paid purity field does not exist")
                                         return False
                                 
                                 return True
                             else:
-                                log.warning(f"reduced bool list not True but {res} of type {type(res)}")
+                                logging_wrapper_warn(f"reduced bool list not True but {res} of type {type(res)}")
                                 return False
 
-                        log.warning(f"stack size not 9 or greater but {self.stack.size()}")
+                        logging_wrapper_warn(f"stack size not 9 or greater but {self.stack.size()}")
                         return False
                     case 'DS':
                         if self.stack.size() >= 11:
@@ -290,7 +291,7 @@ class VM:
                             bool_list.append(isinstance(values[8], str))
                             bool_list.append(isinstance(values[9], str))
                             
-                            log.debug(f"bool type list: {bool_list}")
+                            logging_wrapper_debug(f"bool type list: {bool_list}")
                             res = reduce(lambda a, b: a and b, bool_list)
 
                             if isinstance(res, bool) and res:
@@ -299,23 +300,23 @@ class VM:
                                 is_valid_hash = re.search("^[a-f0-9]{64}$", to_check_hash)
 
                                 if not is_valid_hash:
-                                    log.warning(f"Invalid hash provided, {to_check_hash}")
+                                    logging_wrapper_warn(f"Invalid hash provided, {to_check_hash}")
                                     return False
                                 
                                 if values[8] not in ["DEAD", "SICK"]:
-                                    log.warning(f"Invalid section provided for dead sick entry, {values[8]}")
+                                    logging_wrapper_warn(f"Invalid section provided for dead sick entry, {values[8]}")
                                     return False
 
                                 if values[9] not in ["HOUSE", "CAGE"]:
-                                    log.warning(f"Invalid location provided for dead sick entry, {values[9]}")
+                                    logging_wrapper_warn(f"Invalid location provided for dead sick entry, {values[9]}")
                                     return False
 
                                 return True
                             else:
-                                log.warning(f"reduced bool list not True but {res} of type {type(res)}")
+                                logging_wrapper_warn(f"reduced bool list not True but {res} of type {type(res)}")
                                 return False
 
-                        log.warning(f"stack size not 11 or greater but {self.stack.size()}")
+                        logging_wrapper_warn(f"stack size not 11 or greater but {self.stack.size()}")
                         return False
                     case 'EGGS':
                         if self.stack.size() >= 14:
@@ -339,7 +340,7 @@ class VM:
                             bool_list.append(isinstance(values[11], Decimal)  and values[11] >= EARLIEST_VALID_YEAR and values[11] <= Decimal(f'{time.time()}'))
                             bool_list.append(isinstance(values[12], str) and not not re.search("^[\d]+,([0-9]|1[0-9]|2[0-9])$", values[12]))
                             
-                            log.debug(f"bool type list: {bool_list}")
+                            logging_wrapper_debug(f"bool type list: {bool_list}")
                             res = reduce(lambda a, b: a and b, bool_list)
 
                             if isinstance(res, bool) and res:
@@ -348,15 +349,15 @@ class VM:
                                 is_valid_hash = re.search("^[a-f0-9]{64}$", to_check_hash)
 
                                 if not is_valid_hash:
-                                    log.warning(f"Invalid hash provided, {to_check_hash}")
+                                    logging_wrapper_warn(f"Invalid hash provided, {to_check_hash}")
                                     return False
 
                                 return True
                             else:
-                                log.warning(f"reduced bool list not True but {res} of type {type(res)}")
+                                logging_wrapper_warn(f"reduced bool list not True but {res} of type {type(res)}")
                                 return False
 
-                        log.warning(f"stack size not 14 or greater but {self.stack.size()}")
+                        logging_wrapper_warn(f"stack size not 14 or greater but {self.stack.size()}")
                         return False
                     case 'TRADE':
                         if self.stack.size() >= 11:
@@ -378,10 +379,10 @@ class VM:
                             bool_list.append(isinstance(values[9], str))
 
                             if isinstance(values[5], str) and isinstance(values[6], str) and values[5] and values[6]:
-                                log.warning(f"sale hash and purchase hash not empty, contains, purchase hash: {values[5]}, sale hash: {values[6]}")
+                                logging_wrapper_warn(f"sale hash and purchase hash not empty, contains, purchase hash: {values[5]}, sale hash: {values[6]}")
                                 return False
                             
-                            log.debug(f"bool type list: {bool_list}")
+                            logging_wrapper_debug(f"bool type list: {bool_list}")
                             res = reduce(lambda a, b: a and b, bool_list)
                             if isinstance(res, bool) and res:
                                 # check if valid hash
@@ -389,15 +390,15 @@ class VM:
                                 is_valid_hash = re.search("^[a-f0-9]{64}$", to_check_hash)
 
                                 if not is_valid_hash:
-                                    log.warning(f"Invalid hash provided, {to_check_hash}")
+                                    logging_wrapper_warn(f"Invalid hash provided, {to_check_hash}")
                                     return False
                                  
                                 return True
                             else:
-                                log.warning(f"reduced bool list not True but {res} of type {type(res)}")
+                                logging_wrapper_warn(f"reduced bool list not True but {res} of type {type(res)}")
                                 return False
 
-                        log.warning(f"stack size not 11 or greater but {self.stack.size()}")
+                        logging_wrapper_warn(f"stack size not 11 or greater but {self.stack.size()}")
                         return False
                     case _:
                         return False
@@ -431,11 +432,11 @@ class VM:
                     is_valid_hash = re.search("^[a-f0-9]{64}$", self.stack.peek())
 
                     if not is_valid_hash:
-                        log.warning(f"Invalid hash provided for root hash, {self.stack.peek()}")
+                        logging_wrapper_warn(f"Invalid hash provided for root hash, {self.stack.peek()}")
                         return False
                     
                     if 'col_roots' not in self.cache_state['world_state']['main']:
-                        log.warning("col_roots not present in world state main")
+                        logging_wrapper_warn("col_roots not present in world state main")
                         return False
 
                     return self.stack.size() > 1 and isinstance(self.stack.peek2(), str) and (self.stack.peek2() in EVENTC.values() or self.stack.peek2() == 'main')
@@ -474,7 +475,7 @@ class VM:
             case Opcodes.WRITE.value:
                 return 'root' in self.cache_state['world_state']['main'] if 'world_state' in self.cache_state else False
             case _:
-                log.warning(f"Invalid opcode provided, {instr}")
+                logging_wrapper_warn(f"Invalid opcode provided, {instr}")
                 return False
 
     # silently clears log
@@ -495,7 +496,7 @@ class VM:
                 return 0
 
             if size/(1024 * 1024) > 10:
-                log.info(f"found line {last_suc} proceeding with clearing...")
+                logging_wrapper_info(f"found line {last_suc} proceeding with clearing...")
                 lines = []
                 with open(file_, 'r') as fp:
                     lines = fp.readlines()
@@ -505,28 +506,28 @@ class VM:
                         if number >= last_suc-1:
                             fp.write(line)
                 
-                log.info(f'Reduced file size from {round(size/(1024 * 1024), 2)} MB to {round(os.path.getsize(file_)/(1024 * 1024), 2)} MB')
+                logging_wrapper_info(f'Reduced file size from {round(size/(1024 * 1024), 2)} MB to {round(os.path.getsize(file_)/(1024 * 1024), 2)} MB')
 
     def execute(self):
-        log.info(f"Instance id: {str(self.instance_id)}")
-        log.info(f"Code size: {len(self.code)}")
+        logging_wrapper_info(f"Instance id: {str(self.instance_id)}")
+        logging_wrapper_info(f"Code size: {len(self.code)}")
         message = f"Code input: {self.code}"
         message = message[:MAX_CHAR_COUNT_LOG]+"..."  if len(message) > MAX_CHAR_COUNT_LOG else message
-        log.debug(message)
+        logging_wrapper_debug(message)
 
         if not self.is_safe:
-            log.error("execution failed, check")
+            logging_wrapper_error("execution failed, check")
             return None, None, None, None
         
         while self.pc < len(self.code):
             message = f"Stack dump: {self.stack.get_stack()}"
             message = message[:MAX_CHAR_COUNT_LOG]+"..."  if len(message) > MAX_CHAR_COUNT_LOG else message
-            log.debug(message)
+            logging_wrapper_debug(message)
             val = self.code[self.pc]
 
             if not self.is_instr_safe(val, elem=self.code[self.pc+1] if self.pc+1 < len(self.code) and val == Opcodes.PUSH.value else None):
                 res = [name for name, member in Opcodes.__members__.items() if member.value == val]
-                log.error(f"Instruction provided not safe, {val}: {res[0] if len(res) > 0 else res}")
+                logging_wrapper_error(f"Instruction provided not safe, {val}: {res[0] if len(res) > 0 else res}")
                 return None, None, None, None
 
             if val == Opcodes.PUSH.value:
@@ -546,24 +547,24 @@ class VM:
 
                 if self.stack.size():
                     # no update was made to firestore, hence just return computed output
-                    log.info(f"execution success, result: {self.stack.peek()}")
+                    logging_wrapper_info(f"execution success, result: {self.stack.peek()}")
                     return self.stack.pop(), None, None, 0
 
-                log.info(f"execution success, replaced {self.memory['TOTALREPLACE']}, created {self.memory['TOTALCREATES']}, deleted {self.memory['TOTALDELETES']} entries")
+                logging_wrapper_info(f"execution success, replaced {self.memory['TOTALREPLACE']}, created {self.memory['TOTALCREATES']}, deleted {self.memory['TOTALDELETES']} entries")
                 for c in self.memory['ADDED']:
-                    log.info(f"collection: {c} added {self.memory['ADDED'][c]} entries")
+                    logging_wrapper_info(f"collection: {c} added {self.memory['ADDED'][c]} entries")
 
                 for c in self.memory['REPLACED']:
-                    log.info(f"collection: {c} entries replaced {self.memory['REPLACED'][c]['num']}")
-                    log.info(f"hashes of replaced entries: {[x[:5] for x in self.memory['REPLACED'][c]['hashes']]}")
+                    logging_wrapper_info(f"collection: {c} entries replaced {self.memory['REPLACED'][c]['num']}")
+                    logging_wrapper_info(f"hashes of replaced entries: {[x[:5] for x in self.memory['REPLACED'][c]['hashes']]}")
                 
                 return None, self.cache_state, self.cache_accounts, 0
             
             if self.stack is None and self.pc is None and self.cache_state is None and self.cache_accounts is None:
                 # execution failed
-                log.error("execution failed")
+                logging_wrapper_error("execution failed")
                 return None, None, None, 0
         
-        log.error("Unclean exit, no STOP opcode")
+        logging_wrapper_error("Unclean exit, no STOP opcode")
         return None, None, None, 0
 

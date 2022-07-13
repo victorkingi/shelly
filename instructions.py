@@ -73,79 +73,27 @@ cache_ui_txs = {}
 cache_verification_data = {}
 cache_dashboard_data = {}
 
-NAME = 'JEFF'
-
-def get_tx():
-    results = db.collection('sales').where("date.unix", ">=", 1651968000).stream()
-    total = 0
-    for doc in results:
-        vals = doc.to_dict()
-        if vals['by'] == NAME or True:
-            if vals['buyer'] == 'DUKA':
-                print(doc.id[:5], vals['buyer'])
-                print("amount", vals['tray_no'] * vals['tray_price'])
-                total += vals['tray_no'] * vals['tray_price']
-    print("final", total)
-
-def check():
-    users = {
-        '04d08c83bedef01c48c80c7d8bc4caceb102f32eec4a423136b16b2c5049951884abedcdfdeaf8f9413a7b61e9c607793eacafa7287200cef45f9a4cb4320dd390': 'BABRA',
-        '045371c35c8460a5ee16746ae46a29ac03a2eef67da5985377f34491edede0b654c508c851aeded107d7de7d560c21ac759dd547a289fd097ecad5f718c2edcfef': 'VICTOR',
-        '043139f6bc7808ece9e00aacd80d5d707406c798a35385105ae72b4404d8281cb2f18423a10e65f8569807ee71d53c8fab08cb5e08fb2813b81cbef6294a7181c6': 'JEFF',
-        '04ec74ad5144caefdba5820504a244b1456fdc3bf1031cbe77fc703f61294b42dcce3abe93ff94789d0b65c9b80d667da0708f99f057624e8a8ca64c8272fe66d7': 'PURITY',
-        '04fe89d8d08732b07a5be4d0da407019e0a372f119c0979b6a0890da41a02c913d2df5c97c60e63b3220e030901a95cc75988cbf39b9b857e718b4684ba6948a58': 'ANNE',
-        '04b6f2ef91fbba1e3939724568964c273914d525d4c39c4f6c0af9356df300c6a5cefca80bc9b2010ed79fe7f58b65f2cf27bdadc60c4ddec59555e202da15a461': 'BANK',
-    }
-    query = db.collection('blockchain').order_by("minedOn", direction=firestore.Query.ASCENDING)
-    results = query.get()
-    bal = Decimal(0)
-    TX = {}
-
-    for doc in results:
-        chain = doc.to_dict()
-        chain = chain['chain']
-        for block in chain:
-            txs = block['transactions']
-            for tx in txs:
-                if 'toAddress' in tx:
-                    if tx['fromAddress'] in users or tx['toAddress'] in users:
-                        if users.get(tx['fromAddress'], 'nil') == NAME:
-                            TX = tx
-                            print("am:", tx['amount'], "from", users.get(tx['fromAddress'], 'nil'), 'to', users.get(tx['toAddress'], 'nil'))
-                            bal -= Decimal(str(tx['amount']))
-                        if users.get(tx['toAddress'], 'nil') == NAME:
-                            print("am:", tx['amount'], "from", users.get(tx['fromAddress'], 'nil'), 'to', users.get(tx['toAddress'], 'nil'))
-                            TX = tx
-                            bal += Decimal(str(tx['amount']))
-
-    print("fin", TX) 
-    print(bal)
-    # all sales so far by dad, trades not included print((2900*2)+(5*290*12)+2900+(43*300)+(20*300)+(8*290)+(40*300)+(6*290)+(13*290)+(5*300*4)+(9*310)+(2*300)+(8*300)+(12*310))
-
-#check()
-#get_tx()
-
 
 def push(elem=None, stack=None, memory=None, pc=None, analysed=None):
     prev_type = type(elem)
-    log.debug(f"{pc}: PUSH {elem}, {type(elem)}")
+    logging_wrapper_debug(f"{pc}: PUSH {elem}, {type(elem)}")
     pc += 2
 
     if isinstance(elem, float) or isinstance(elem, int):
         elem = Decimal(str(elem))
-        log.debug(f"converted from {prev_type} to {type(elem)}")
+        logging_wrapper_debug(f"converted from {prev_type} to {type(elem)}")
 
     if isinstance(elem, Decimal) or isinstance(elem, str):
         stack.push(elem)
         return stack, memory, pc, cache_state, cache_accounts
     else:
-        log.error(f"Attempted to push not a str or a decimal type, {type(elem)}")
+        logging_wrapper_error(f"Attempted to push not a str or a decimal type, {type(elem)}")
         return None, None, None, None, None
 
 
 # does not return the element poped
 def pop(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: POP")
+    logging_wrapper_debug(f"{pc}: POP")
     pc += 1
 
     stack.pop()
@@ -154,7 +102,7 @@ def pop(stack=None, memory=None, pc=None, analysed=None):
 
 
 def add(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: ADD")
+    logging_wrapper_debug(f"{pc}: ADD")
     pc += 1
 
     a = stack.pop()
@@ -165,7 +113,7 @@ def add(stack=None, memory=None, pc=None, analysed=None):
 
 
 def lt(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: LT")
+    logging_wrapper_debug(f"{pc}: LT")
     pc += 1
 
     a = stack.pop()
@@ -176,7 +124,7 @@ def lt(stack=None, memory=None, pc=None, analysed=None):
 
 
 def gt(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: GT")
+    logging_wrapper_debug(f"{pc}: GT")
     pc += 1
 
     a = stack.pop()
@@ -187,7 +135,7 @@ def gt(stack=None, memory=None, pc=None, analysed=None):
 
 
 def sub(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: SUB")
+    logging_wrapper_debug(f"{pc}: SUB")
     pc += 1
 
     a = stack.pop()
@@ -197,7 +145,7 @@ def sub(stack=None, memory=None, pc=None, analysed=None):
 
 
 def mul(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: MUL")
+    logging_wrapper_debug(f"{pc}: MUL")
     pc += 1
 
     a = stack.pop()
@@ -207,14 +155,14 @@ def mul(stack=None, memory=None, pc=None, analysed=None):
 
 
 def div(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: DIV")
+    logging_wrapper_debug(f"{pc}: DIV")
     pc += 1
 
     a = stack.pop()
     b = stack.pop()
     if not a:
         # division by zero
-        log.error("Division by zero")
+        logging_wrapper_error("Division by zero")
         return None, None, None, None, None
     stack.push(b / a)
     
@@ -222,7 +170,7 @@ def div(stack=None, memory=None, pc=None, analysed=None):
 
 
 def dup(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: DUP")
+    logging_wrapper_debug(f"{pc}: DUP")
     pc += 1
 
     num = stack.pop()
@@ -239,7 +187,7 @@ def dup(stack=None, memory=None, pc=None, analysed=None):
 
 
 def stop(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: STOP")
+    logging_wrapper_debug(f"{pc}: STOP")
     pc += 1
 
     if stack.size() == 1:
@@ -290,25 +238,25 @@ def stop(stack=None, memory=None, pc=None, analysed=None):
             # successful exit
             val = stack.pop()
             if not isinstance(val, Decimal):
-                log.warning(f"Non Dec value popped from stack, got {type(val)} expected decimal, value: {val}")
+                logging_wrapper_warn(f"Non Dec value popped from stack, got {type(val)} expected decimal, value: {val}")
                 stack.push(val)
                 return stack, memory, -1, cache_state, cache_accounts
             
             try:
                 val = val.quantize(TWOPLACES)
             except InvalidOperation:
-                log.error(f"Invalid Decimal Operation; stack value: {val}")
+                logging_wrapper_error(f"Invalid Decimal Operation; stack value: {val}")
                 return None, None, None, None, None
             
             if val.is_nan():
-                log.error(f"NaN value popped from stack, {val}")
+                logging_wrapper_error(f"NaN value popped from stack, {val}")
                 return None, None, None, None, None
             
             stack.push(val)
             return stack, memory, -1, cache_state, cache_accounts
 
     if stack.size():
-        log.error(f"Stack still contains: {stack.get_stack()}")
+        logging_wrapper_error(f"Stack still contains: {stack.get_stack()}")
         return None, None, None, None, None
 
     # successful exit
@@ -316,7 +264,7 @@ def stop(stack=None, memory=None, pc=None, analysed=None):
 
 
 def mstore(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: MSTORE")
+    logging_wrapper_debug(f"{pc}: MSTORE")
     pc += 1
 
     elem = stack.pop()
@@ -328,14 +276,14 @@ def mstore(stack=None, memory=None, pc=None, analysed=None):
     elif elem in event_keys:
         memory['EVENT'] = elem
     else:
-        log.error("storage location not assigned yet")
+        logging_wrapper_error("storage location not assigned yet")
         return None, None, None, None, None
 
     return stack, memory, pc, cache_state, cache_accounts
 
 
 def mload(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: MLOAD")
+    logging_wrapper_debug(f"{pc}: MLOAD")
     pc += 1
 
     key = stack.pop()
@@ -346,7 +294,7 @@ def mload(stack=None, memory=None, pc=None, analysed=None):
 
 # pushes root hash of a collection to stack
 def root_hash(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: ROOTHASH")
+    logging_wrapper_debug(f"{pc}: ROOTHASH")
     pc += 1
 
     collection_name = stack.pop()
@@ -357,12 +305,12 @@ def root_hash(stack=None, memory=None, pc=None, analysed=None):
                 stack.push(cache_state[collection_name]['state']['root_hash'])
                 return stack, memory, pc, cache_state, cache_accounts
     
-    log.error(f"collection name {collection_name} does not exist or state and root hash do not exist")
+    logging_wrapper_error(f"collection name {collection_name} does not exist or state and root hash do not exist")
     return None, None, None, None, None
 
 
 def sha256(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: SHA256")
+    logging_wrapper_debug(f"{pc}: SHA256")
     pc += 1
 
     m = hashlib.sha256()
@@ -375,7 +323,7 @@ def sha256(stack=None, memory=None, pc=None, analysed=None):
     
     message = f"all hashes: {to_hash}"
     message = message[:MAX_CHAR_COUNT_LOG]+"..." if len(message) > MAX_CHAR_COUNT_LOG else message
-    log.debug(message)
+    logging_wrapper_debug(message)
     m.update(to_hash.encode())
     stack.push(m.hexdigest())
 
@@ -383,20 +331,20 @@ def sha256(stack=None, memory=None, pc=None, analysed=None):
 
 
 def panic(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: PANIC")
+    logging_wrapper_debug(f"{pc}: PANIC")
     pc += 1
 
     val = stack.pop()
 
     if val:
-        log.error("Program exited with panic")
+        logging_wrapper_error("Program exited with panic")
         return None, None, None, None, None
 
     return stack, memory, pc, cache_state, cache_accounts
 
 
 def is_zero(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: ISZERO")
+    logging_wrapper_debug(f"{pc}: ISZERO")
     pc += 1
 
     val = stack.pop()
@@ -407,7 +355,7 @@ def is_zero(stack=None, memory=None, pc=None, analysed=None):
 
 
 def eq(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: EQ")
+    logging_wrapper_debug(f"{pc}: EQ")
     pc += 1
 
     a = stack.pop()
@@ -418,7 +366,7 @@ def eq(stack=None, memory=None, pc=None, analysed=None):
 
 
 def jumpif(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: JUMPIF")
+    logging_wrapper_debug(f"{pc}: JUMPIF")
     pc += 1
     temp = int(pc)
 
@@ -426,21 +374,21 @@ def jumpif(stack=None, memory=None, pc=None, analysed=None):
     pc = analysed[str(temp-1)] if str(temp-1) in analysed and a == Decimal(1) else pc
 
     if str(temp-1) not in analysed:
-        log.error(f"Selected jump destination does not exist, {temp-1}, analysed: {analysed}")
+        logging_wrapper_error(f"Selected jump destination does not exist, {temp-1}, analysed: {analysed}")
         return None, None, None, None, None
     
     return stack, memory, pc, cache_state, cache_accounts
 
 
 def jumpdes(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: JUMPDEST")
+    logging_wrapper_debug(f"{pc}: JUMPDEST")
     pc += 1
     
     return stack, memory, pc, cache_state, cache_accounts
 
 
 def get_state(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: UPDATESTATE")
+    logging_wrapper_debug(f"{pc}: UPDATESTATE")
     pc += 1
 
     collection_name = stack.pop()
@@ -449,11 +397,11 @@ def get_state(stack=None, memory=None, pc=None, analysed=None):
     state_dict = collection_ref.document('state').get().to_dict()
 
     if state_dict is None:
-        log.error(f"state doc for {collection_name}, does not exist")
+        logging_wrapper_error(f"state doc for {collection_name}, does not exist")
         return None, None, None, None, None
 
     if not cache_state[collection_name]['state']['root_hash']:
-        log.info("no state cache exists, adding...")
+        logging_wrapper_info("no state cache exists, adding...")
         cache_state[collection_name]['state'] = state_dict
 
         return stack, memory, pc, cache_state, cache_accounts
@@ -464,7 +412,7 @@ def get_state(stack=None, memory=None, pc=None, analysed=None):
             return stack, memory, pc, cache_state, cache_accounts
         
         else:
-            log.error("root hashes don't match")
+            logging_wrapper_error("root hashes don't match")
             return None, None, None, None, None
     
 
@@ -473,7 +421,7 @@ def get_state(stack=None, memory=None, pc=None, analysed=None):
 # checking if a document exists require just the state document
 # followed by a jumpif
 def update_cache(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: UPDATECACHE")
+    logging_wrapper_debug(f"{pc}: UPDATECACHE")
     pc += 1
 
     collection_name = stack.pop()
@@ -509,26 +457,26 @@ def update_cache(stack=None, memory=None, pc=None, analysed=None):
             }
         }
         map_nested_dicts_modify(cache_state, lambda v: Decimal(f'{v}') if isinstance(v, float) or isinstance(v, int) else v)
-        log.info("Updated main state")
+        logging_wrapper_info("Updated main state")
 
         docs = db.collection('tx_ui').stream()
         for doc in docs:
             global cache_ui_txs
             cache_ui_txs[doc.id] = doc.to_dict()
-        log.info("updated tx_ui")
+        logging_wrapper_info("updated tx_ui")
         
         return stack, memory, pc, cache_state, cache_accounts
 
     state_dict = collection_ref.document('state').get().to_dict()
 
     if state_dict is None:
-        log.error(f"state doc for {collection_name}, does not exist")
+        logging_wrapper_error(f"state doc for {collection_name}, does not exist")
         return None, None, None, None, None
     
     if not cache_state[collection_name]['state']['root_hash']:
         if collection_name == EVENTC[TRADE]:
             if not cache_state[EVENTC[SELL]]['state']['root_hash'] or not cache_state[EVENTC[BUY]]['state']['root_hash']:
-                log.warning("sales or purchases don't exist, querying")
+                logging_wrapper_warn("sales or purchases don't exist, querying")
                 query = db.collection(EVENTC[SELL]).order_by('submitted_on.unix', direction=firestore.Query.ASCENDING)
                 results = query.stream()
                 for doc in results:
@@ -541,11 +489,11 @@ def update_cache(stack=None, memory=None, pc=None, analysed=None):
 
         elif collection_name == EVENTC[SELL] or collection_name == EVENTC[BUY]:
             if not cache_state[EVENTC[TRADE]]['state']['root_hash']:
-                log.warning("trades should be queried before sales and purchases")
+                logging_wrapper_warn("trades should be queried before sales and purchases")
                 return None, None, None, None, None
 
         # no cache exists, proceed with query
-        log.info("no cache exists, querying...")
+        logging_wrapper_info("no cache exists, querying...")
         query = collection_ref.order_by('submitted_on.unix', direction=firestore.Query.ASCENDING)
         results = query.stream()
         cache_state[collection_name]['state'] = state_dict
@@ -555,12 +503,12 @@ def update_cache(stack=None, memory=None, pc=None, analysed=None):
             if EVENTC[TRADE] == collection_name:
                 if cache_state[collection_name][doc.id]['sale_hash']:
                     if cache_state[collection_name][doc.id]['sale_hash'] not in cache_state[EVENTC[SELL]]:
-                        log.error(f"A trade doc but no corresponding sale doc, trade hash: {doc.id} sale hash: {cache_state[collection_name][doc.id]['sale_hash']}")
+                        logging_wrapper_error(f"A trade doc but no corresponding sale doc, trade hash: {doc.id} sale hash: {cache_state[collection_name][doc.id]['sale_hash']}")
                         return None, None, None, None, None
 
                 elif cache_state[collection_name][doc.id]['purchase_hash']:
                     if cache_state[collection_name][doc.id]['purchase_hash'] not in cache_state[EVENTC[BUY]]:
-                        log.error(f"A trade doc but no corresponding purchase doc, trade hash: {doc.id} purchase hash: {cache_state[collection_name][doc.id]['purchase_hash']}")
+                        logging_wrapper_error(f"A trade doc but no corresponding purchase doc, trade hash: {doc.id} purchase hash: {cache_state[collection_name][doc.id]['purchase_hash']}")
                         return None, None, None, None, None
 
             elif EVENTC[SELL] == collection_name:
@@ -574,7 +522,7 @@ def update_cache(stack=None, memory=None, pc=None, analysed=None):
                         break
                 
                 if not found_match:
-                    log.error(f"A sale doc but no corresponding trade doc, sale hash: {doc.id}")
+                    logging_wrapper_error(f"A sale doc but no corresponding trade doc, sale hash: {doc.id}")
                     return None, None, None, None, None
             
             elif EVENTC[BUY] == collection_name:
@@ -588,23 +536,23 @@ def update_cache(stack=None, memory=None, pc=None, analysed=None):
                         break
                 
                 if not found_match:
-                    log.error(f"A purchase doc but no corresponding trade doc, purchase hash: {doc.id}")
+                    logging_wrapper_error(f"A purchase doc but no corresponding trade doc, purchase hash: {doc.id}")
                     return None, None, None, None, None
 
             docs_set.add(doc.id)
 
         if len(set(cache_state[collection_name]['state']['all_tx_hashes'].keys()) - docs_set) != 0 or len(docs_set - set(cache_state[collection_name]['state']['all_tx_hashes'].keys())) != 0:
-            log.warning(f"Found docs in state but not in {collection_name}, {set(cache_state[collection_name]['state']['all_tx_hashes'].keys()) - docs_set}")
-            log.warning(f"Vice Versa, {docs_set - set(cache_state[collection_name]['state']['all_tx_hashes'].keys())}")
+            logging_wrapper_warn(f"Found docs in state but not in {collection_name}, {set(cache_state[collection_name]['state']['all_tx_hashes'].keys()) - docs_set}")
+            logging_wrapper_warn(f"Vice Versa, {docs_set - set(cache_state[collection_name]['state']['all_tx_hashes'].keys())}")
             return None, None, None, None, None
         
         if 'all_hashes' in cache_state['world_state']['main']:
             if len(set(cache_state['world_state']['main']['all_hashes'][collection_name].keys()) - docs_set) != 0 or len(docs_set - set(cache_state['world_state']['main']['all_hashes'][collection_name].keys())) != 0:
-                log.warning(f"Found docs in world state but not in {collection_name}, {set(cache_state['world_state']['main']['all_hashes'][collection_name].keys()) - docs_set}")
-                log.warning(f"Vice Versa, {docs_set - set(cache_state['world_state']['main']['all_hashes'][collection_name].keys())}")
+                logging_wrapper_warn(f"Found docs in world state but not in {collection_name}, {set(cache_state['world_state']['main']['all_hashes'][collection_name].keys()) - docs_set}")
+                logging_wrapper_warn(f"Vice Versa, {docs_set - set(cache_state['world_state']['main']['all_hashes'][collection_name].keys())}")
                 return None, None, None, None, None
         else:
-            log.error("All hashes not present in world state main")
+            logging_wrapper_error("All hashes not present in world state main")
             return None, None, None, None, None
         
         if collection_name == EVENTC[TRADE]:
@@ -617,13 +565,13 @@ def update_cache(stack=None, memory=None, pc=None, analysed=None):
         return stack, memory, pc, cache_state, cache_accounts
     
     else:
-        log.info("cache exists confirming validity...")
+        logging_wrapper_info("cache exists confirming validity...")
         # check if state hashes match
         root_hash = state_dict['root_hash']
         local_hash = cache_state[collection_name]['state']['root_hash']
         
         if local_hash == root_hash:
-            log.info("hashes match no need for update")
+            logging_wrapper_info("hashes match no need for update")
             return stack, memory, pc, cache_state, cache_accounts
         else:
             # get a set of all hashes, perform set difference of local and remote.
@@ -656,16 +604,16 @@ def update_cache(stack=None, memory=None, pc=None, analysed=None):
                 map_nested_dicts_modify(cache_state, lambda v: Decimal(f'{v}') if isinstance(v, float) or isinstance(v, int) else v)
                 map_nested_dicts_modify(cache_accounts, lambda v: Decimal(f'{v}') if isinstance(v, float) or isinstance(v, int) else v)
 
-                log.info("New entries added or deleted on query")
+                logging_wrapper_info("New entries added or deleted on query")
                 
                 return stack, memory, pc, cache_state, cache_accounts
             else:
-                log.info("No new entries found for update, proceeding...")
+                logging_wrapper_info("No new entries found for update, proceeding...")
                 return stack, memory, pc, cache_state, cache_accounts
 
 
 def timestamp_now(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: NOW")
+    logging_wrapper_debug(f"{pc}: NOW")
     pc += 1
 
     stack.push(Decimal(f'{int(time.time())}'))
@@ -673,7 +621,7 @@ def timestamp_now(stack=None, memory=None, pc=None, analysed=None):
 
 
 def swap(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: SWAP")
+    logging_wrapper_debug(f"{pc}: SWAP")
     pc += 1
 
     a = stack.pop()
@@ -684,7 +632,7 @@ def swap(stack=None, memory=None, pc=None, analysed=None):
 
 
 def create_address(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: CADDR")
+    logging_wrapper_debug(f"{pc}: CADDR")
     pc += 1
 
     address_name = stack.pop()
@@ -695,7 +643,7 @@ def create_address(stack=None, memory=None, pc=None, analysed=None):
 
 
 def delete_address(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: DADDR")
+    logging_wrapper_debug(f"{pc}: DADDR")
     pc += 1
 
     address_name = stack.pop()
@@ -704,7 +652,7 @@ def delete_address(stack=None, memory=None, pc=None, analysed=None):
 
 
 def create_entry(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: CENTRY")
+    logging_wrapper_debug(f"{pc}: CENTRY")
     pc += 1
 
     entry_name = stack.pop()
@@ -942,14 +890,14 @@ def create_entry(stack=None, memory=None, pc=None, analysed=None):
     if not is_replaced:
         message = f'Entry added, collection: {EVENTC[entry_name]}, {cache_state[EVENTC[entry_name]][entry_hash]}'
         message = message[:MAX_CHAR_COUNT_LOG]+"..." if len(message) > MAX_CHAR_COUNT_LOG else message
-        log.info(message)
+        logging_wrapper_info(message)
         memory['TOTALCREATES'] += 1
         if EVENTC[entry_name] in memory['ADDED']:
             memory['ADDED'][EVENTC[entry_name]] += 1
         else:
             memory['ADDED'][EVENTC[entry_name]] = 1
     else:
-        log.info(f'Entry replaced, collection: {EVENTC[entry_name]}, {cache_state[EVENTC[entry_name]][entry_hash]}')
+        logging_wrapper_info(f'Entry replaced, collection: {EVENTC[entry_name]}, {cache_state[EVENTC[entry_name]][entry_hash]}')
         memory['TOTALCREATES'] += 1
         memory['TOTALREPLACE'] += 1
         if EVENTC[entry_name] in memory['REPLACED']:
@@ -967,7 +915,7 @@ def create_entry(stack=None, memory=None, pc=None, analysed=None):
 
 
 def delete_entry(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: DENTRY")
+    logging_wrapper_debug(f"{pc}: DENTRY")
     pc += 1
 
     tx_hash = stack.pop()
@@ -984,7 +932,7 @@ def delete_entry(stack=None, memory=None, pc=None, analysed=None):
     }
     del cache_state[collection_name][tx_hash]
     
-    log.info(f"entry deleted in collection {collection_name}, id: {tx_hash}")
+    logging_wrapper_info(f"entry deleted in collection {collection_name}, id: {tx_hash}")
     memory['TOTALDELETES'] += 1
 
     if collection_name in memory['DELETES']:
@@ -997,7 +945,7 @@ def delete_entry(stack=None, memory=None, pc=None, analysed=None):
 
 
 def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: CALCSTATE")
+    logging_wrapper_debug(f"{pc}: CALCSTATE")
     pc += 1
 
     collection_name = stack.pop()
@@ -1009,11 +957,11 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
 
     message = f"cache after prev_state update but before sort: {cache_state[collection_name]}"
     message = message[:MAX_CHAR_COUNT_LOG]+"..." if len(message) > MAX_CHAR_COUNT_LOG else message
-    log.debug(message)
+    logging_wrapper_debug(message)
     sorted_tuples = sorted(cache_state[collection_name].items(), key=lambda item: item[1]['date']['unix'] if 'date' in item[1] and 'unix' in item[1]['date'] else Decimal(0))
     message = f"cache after prev_state update after sort: {sorted_tuples}"
     message = message[:MAX_CHAR_COUNT_LOG]+"..." if len(message) > MAX_CHAR_COUNT_LOG else message
-    log.debug(message)
+    logging_wrapper_debug(message)
     cache_state[collection_name] = {k: v for k, v in sorted_tuples}
     cache_state[collection_name]['state'] = dict(clean_states(all_tx_hashes=cache_state[collection_name]['state']['all_tx_hashes'])[collection_name]['state'])
     cache_state[collection_name]['prev_states'] = dict(clean_states(all_tx_hashes=cache_state[collection_name]['state']['all_tx_hashes'])[collection_name]['prev_states'])
@@ -1047,11 +995,11 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
                     cache_state[collection_name]['state']['balances'][user] -= Decimal(str(tx['amount']))
             
             if cache_state[collection_name]['state']['balances'][user] != cache_accounts[user]:
-                log.error(f"balances do not match for address {user}, state: {cache_state[collection_name]['state']['balances'][user]}, acc: {cache_accounts[user]}")
+                logging_wrapper_error(f"balances do not match for address {user}, state: {cache_state[collection_name]['state']['balances'][user]}, acc: {cache_accounts[user]}")
                 return None, None, None, None, None
             
             if cache_state[collection_name]['state']['balances'][user] < Decimal(0):
-                log.error(f"address {user} balance is negative {cache_state[collection_name]['state']['balances'][user]}")
+                logging_wrapper_error(f"address {user} balance is negative {cache_state[collection_name]['state']['balances'][user]}")
                 return None, None, None, None, None
         
         return stack, memory, pc, cache_state, cache_accounts
@@ -1086,18 +1034,18 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
                 while str(prev_week) not in cache_state[collection_name]['state']['week_trays_sold_earned']:
                     if prev_week < 0:
                         if Decimal(next_week) != Decimal(1618866000):
-                            log.error(f"No previous week found from {next_week}")
+                            logging_wrapper_error(f"No previous week found from {next_week}")
                             return None, None, None, None, None
                         
                         prev_week = next_week - week_in_seconds
                         cache_state[collection_name]['state']['week_trays_sold_earned'][str(prev_week)] = {}
-                        log.warning(f"No previous week found from {prev_week}")
+                        logging_wrapper_warn(f"No previous week found from {prev_week}")
                         break
                     prev_week -= week_in_seconds
          
                 while str(temp_next_week) not in cache_state[collection_name]['state']['week_trays_sold_earned']:
                     if temp_next_week < 0:
-                        log.error(f"No next week found from {next_week}")
+                        logging_wrapper_error(f"No next week found from {next_week}")
                         return None, None, None, None, None
                     temp_next_week -= week_in_seconds
           
@@ -1145,18 +1093,18 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
                 while str(prev_month) not in cache_state[collection_name]['state']['month_trays_sold_earned']:
                     if prev_month < 0:
                         if Decimal(next_month) != Decimal(1620680400):
-                            log.error(f"No previous month found from {next_month}")
+                            logging_wrapper_error(f"No previous month found from {next_month}")
                             return None, None, None, None, None
                         
                         prev_month = next_month - month_in_seconds
                         cache_state[collection_name]['state']['month_trays_sold_earned'][str(prev_month)] = {}
-                        log.warning(f"No previous month found from {prev_month}")
+                        logging_wrapper_warn(f"No previous month found from {prev_month}")
                         break
                     prev_month -= month_in_seconds
                 
                 while str(temp_next_month) not in cache_state[collection_name]['state']['month_trays_sold_earned']:
                     if temp_next_month < 0:
-                        log.error(f"No next month found from {next_month}")
+                        logging_wrapper_error(f"No next month found from {next_month}")
                         return None, None, None, None, None
                     temp_next_month -= month_in_seconds
                 
@@ -1220,18 +1168,18 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
                 while str(prev_week) not in cache_state[collection_name]['state']['week_items_bought_spent']:
                     if prev_week < 0:
                         if Decimal(next_week) != Decimal(1618866000):
-                            log.error(f"No previous week found from {next_week}")
+                            logging_wrapper_error(f"No previous week found from {next_week}")
                             return None, None, None, None, None
 
                         prev_week = next_week - week_in_seconds
                         cache_state[collection_name]['state']['week_items_bought_spent'][str(prev_week)] = {}
-                        log.warning(f"No previous week found from {prev_week}")
+                        logging_wrapper_warn(f"No previous week found from {prev_week}")
                         break
                     prev_week -= week_in_seconds
                 
                 while str(temp_next_week) not in cache_state[collection_name]['state']['week_items_bought_spent']:
                     if temp_next_week < 0:
-                        log.error(f"No next week found from {next_week}")
+                        logging_wrapper_error(f"No next week found from {next_week}")
                         return None, None, None, None, None
                     temp_next_week -= week_in_seconds
                 
@@ -1279,18 +1227,18 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
                 while str(prev_month) not in cache_state[collection_name]['state']['month_items_bought_spent']:
                     if prev_month < 0:
                         if Decimal(next_month) != Decimal(1620680400):
-                            log.error(f"No previous month found from {next_month}")
+                            logging_wrapper_error(f"No previous month found from {next_month}")
                             return None, None, None, None, None
                         
                         prev_month = next_month - month_in_seconds
                         cache_state[collection_name]['state']['month_items_bought_spent'][str(prev_month)] = {}
-                        log.warning(f"No previous month found from {prev_month}")
+                        logging_wrapper_warn(f"No previous month found from {prev_month}")
                         break
                     prev_month -= month_in_seconds
                 
                 while str(temp_next_month) not in cache_state[collection_name]['state']['month_items_bought_spent']:
                     if temp_next_month < 0:
-                        log.error(f"No next month found from {next_month}")
+                        logging_wrapper_error(f"No next month found from {next_month}")
                         return None, None, None, None, None
                     temp_next_month -= month_in_seconds
                 
@@ -1361,17 +1309,17 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
                 while str(prev_week) not in cache_state[collection_name]['state']['week_trays_and_exact']:
                     if prev_week < 0:
                         if Decimal(next_week) != Decimal(1618866000):
-                            log.error(f"No previous week found from {next_week}")
+                            logging_wrapper_error(f"No previous week found from {next_week}")
                             return None, None, None, None, None
                         
                         prev_week = next_week - week_in_seconds
                         cache_state[collection_name]['state']['week_trays_and_exact'][str(prev_week)] = {}
-                        log.warning(f"No previous week found from {prev_week}")
+                        logging_wrapper_warn(f"No previous week found from {prev_week}")
                         break
                     prev_week -= week_in_seconds
                 while str(temp_next_week) not in cache_state[collection_name]['state']['week_trays_and_exact']:
                     if temp_next_week < 0:
-                        log.error(f"No next week found from {next_week}")
+                        logging_wrapper_error(f"No next week found from {next_week}")
                         return None, None, None, None, None
                     temp_next_week -= week_in_seconds
 
@@ -1411,17 +1359,17 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
                 while str(prev_month) not in cache_state[collection_name]['state']['month_trays_and_exact']:
                     if prev_month < 0:
                         if Decimal(next_month) != Decimal(1620680400):
-                            log.error(f"No previous month found from {next_month}")
+                            logging_wrapper_error(f"No previous month found from {next_month}")
                             return None, None, None, None, None
                         
                         prev_month = next_month - month_in_seconds
                         cache_state[collection_name]['state']['month_trays_and_exact'][str(prev_month)] = {}
-                        log.warning(f"No previous month found from {prev_month}")
+                        logging_wrapper_warn(f"No previous month found from {prev_month}")
                         break
                     prev_month -= month_in_seconds
                 while str(temp_next_month) not in cache_state[collection_name]['state']['month_trays_and_exact']:
                     if temp_next_month < 0:
-                        log.error(f"No next month found from {next_month}")
+                        logging_wrapper_error(f"No next month found from {next_month}")
                         return None, None, None, None, None
                     temp_next_month -= month_in_seconds
 
@@ -1488,7 +1436,7 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
                 last = int(x)
             else:
                 if int(x)-(24*60*60) != last:
-                    log.error(f"Mismatch of trays collected dates, got {x} but expected {int(x)-(24*60*60)}")
+                    logging_wrapper_error(f"Mismatch of trays collected dates, got {x} but expected {int(x)-(24*60*60)}")
                     return None, None, None, None, None
             last = int(x)
             if i_w == 7 and i_m == 28:
@@ -1500,7 +1448,7 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
                     cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_exact'] = cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_exact'].quantize(TWOPLACES)
 
                 except InvalidOperation:
-                    log.error(f"Invalid Decimal Operation on week percent, value: {cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_given']}, {cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_exact']}")
+                    logging_wrapper_error(f"Invalid Decimal Operation on week percent, value: {cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_given']}, {cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_exact']}")
                     return None, None, None, None, None
                 
                 aggregate_week_percent = {
@@ -1527,7 +1475,7 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
                     cache_state[EVENTC[EGGS]]['state']['month_trays_and_exact'][x]['percent_exact'] = cache_state[EVENTC[EGGS]]['state']['month_trays_and_exact'][x]['percent_exact'].quantize(TWOPLACES)
 
                 except InvalidOperation:
-                    log.error(f"Invalid Decimal Operation on month percent, value: {cache_state[EVENTC[EGGS]]['state']['month_trays_and_exact'][x]['percent_given']}, {cache_state[EVENTC[EGGS]]['state']['month_trays_and_exact'][x]['percent_exact']}")
+                    logging_wrapper_error(f"Invalid Decimal Operation on month percent, value: {cache_state[EVENTC[EGGS]]['state']['month_trays_and_exact'][x]['percent_given']}, {cache_state[EVENTC[EGGS]]['state']['month_trays_and_exact'][x]['percent_exact']}")
                     return None, None, None, None, None
                 
                 
@@ -1549,7 +1497,7 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
                     cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_exact'] = cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_exact'].quantize(TWOPLACES)
 
                 except InvalidOperation:
-                    log.error(f"Invalid Decimal Operation on week percent, value: {cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_given']}, {cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_exact']}")
+                    logging_wrapper_error(f"Invalid Decimal Operation on week percent, value: {cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_given']}, {cache_state[EVENTC[EGGS]]['state']['week_trays_and_exact'][x]['percent_exact']}")
                     return None, None, None, None, None
                 
                 aggregate_week_percent = {
@@ -1575,37 +1523,37 @@ def full_calculate_new_state(stack=None, memory=None, pc=None, analysed=None):
 
 
 def incr_balance(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: INCRBAL")
+    logging_wrapper_debug(f"{pc}: INCRBAL")
     pc += 1
 
     address = stack.pop()
     amount = stack.pop()
     cache_accounts[address] += amount
 
-    log.info(f"New balance of {address}: {cache_accounts[address]}")
+    logging_wrapper_info(f"New balance of {address}: {cache_accounts[address]}")
 
     return stack, memory, pc, cache_state, cache_accounts
 
 
 def decr_balance(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: DECRBAL")
+    logging_wrapper_debug(f"{pc}: DECRBAL")
     pc += 1
 
     address = stack.pop()
     amount = stack.pop()
     temp = cache_accounts[address] - amount
     if temp < Decimal(0):
-        log.error(f"Balance decrement became negative addr: {address} from {cache_accounts[address]}, amount {amount}")
+        logging_wrapper_error(f"Balance decrement became negative addr: {address} from {cache_accounts[address]}, amount {amount}")
         return None, None, None, None, None
     
     cache_accounts[address] -= amount
-    log.info(f"New balance of {address}: {cache_accounts[address]}")
+    logging_wrapper_info(f"New balance of {address}: {cache_accounts[address]}")
 
     return stack, memory, pc, cache_state, cache_accounts
 
 
 def calculate_root_hash(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: CALCROOTHASH")
+    logging_wrapper_debug(f"{pc}: CALCROOTHASH")
     pc += 1
 
     collection_name = stack.pop()
@@ -1620,7 +1568,7 @@ def calculate_root_hash(stack=None, memory=None, pc=None, analysed=None):
         
         tx = cache_state[collection_name][id]
 
-        log.debug(f"{collection_name} id: {id}")
+        logging_wrapper_debug(f"{collection_name} id: {id}")
         true_hashes[id] = get_true_hash_for_tx(tx, collection_name)
 
     i = 0
@@ -1636,7 +1584,7 @@ def calculate_root_hash(stack=None, memory=None, pc=None, analysed=None):
 
 
 def update_root_hash(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: UPROOTHASH")
+    logging_wrapper_debug(f"{pc}: UPROOTHASH")
     pc += 1
 
     hash = stack.pop()
@@ -1646,19 +1594,19 @@ def update_root_hash(stack=None, memory=None, pc=None, analysed=None):
         cache_state['world_state']['main']['col_roots'].append(hash)
         message = f"New state: {cache_state[collection_name]['state']}"
         message = message[:MAX_CHAR_COUNT_LOG]+"..." if len(message) > MAX_CHAR_COUNT_LOG else message
-        log.debug(message)
+        logging_wrapper_debug(message)
         return stack, memory, pc, cache_state, cache_accounts
     else:
         cache_state['world_state']['main']['root'] = hash
         message = f"New main state: {cache_state['world_state']['main']}"
         message = message[:MAX_CHAR_COUNT_LOG]+"..." if len(message) > MAX_CHAR_COUNT_LOG else message
-        log.debug(message)
+        logging_wrapper_debug(message)
         return stack, memory, pc, cache_state, cache_accounts
 
 
 # assumes all required fields are already populated
 def calculate_main_state(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: CALCMAINSTATE")
+    logging_wrapper_debug(f"{pc}: CALCMAINSTATE")
     pc += 1
 
     net_profit = Decimal(cache_state['sales']['state']['total_earned']) - Decimal(cache_state['purchases']['state']['total_spent'])
@@ -1669,7 +1617,7 @@ def calculate_main_state(stack=None, memory=None, pc=None, analysed=None):
         if k in cache_state['purchases']['state']['week_items_bought_spent']:
             spent = cache_state['purchases']['state']['week_items_bought_spent'][k]['spent'] if 'spent' in cache_state['purchases']['state']['week_items_bought_spent'][k] else Decimal(0)
         else:
-            log.warning(f"Nothing bought on week {k}")
+            logging_wrapper_warn(f"Nothing bought on week {k}")
 
         sold = cache_state['sales']['state']['week_trays_sold_earned'][k]['earned'] if 'earned' in cache_state['sales']['state']['week_trays_sold_earned'][k] else Decimal(0)
         net = Decimal(sold) - Decimal(spent)
@@ -1686,7 +1634,7 @@ def calculate_main_state(stack=None, memory=None, pc=None, analysed=None):
         if k in cache_state['purchases']['state']['month_items_bought_spent']:
             spent = cache_state['purchases']['state']['month_items_bought_spent'][k]['spent'] if 'spent' in cache_state['purchases']['state']['month_items_bought_spent'][k] else Decimal(0)
         else:
-            log.warning(f"Nothing bought on month {k}")
+            logging_wrapper_warn(f"Nothing bought on month {k}")
         
         sold = cache_state['sales']['state']['month_trays_sold_earned'][k]['earned'] if 'earned' in cache_state['sales']['state']['month_trays_sold_earned'][k] else Decimal(0)
         net = Decimal(sold) - Decimal(spent)
@@ -1730,13 +1678,13 @@ def calculate_main_state(stack=None, memory=None, pc=None, analysed=None):
 
         while str(current_week) not in cache_state['eggs_collected']['state']['week_trays_and_exact']:
             if current_week < 0:
-                log.error(f"No last week laying data found from {temp}")
+                logging_wrapper_error(f"No last week laying data found from {temp}")
                 return None, None, None, None, None
             current_week -= week_in_seconds
 
         current_week = str(current_week)
     else:
-        log.error("Current week does not exist in eggs_collected")
+        logging_wrapper_error("Current week does not exist in eggs_collected")
         return None, None, None, None, None
     
     if current_month:
@@ -1745,13 +1693,13 @@ def calculate_main_state(stack=None, memory=None, pc=None, analysed=None):
         temp = current_month
         while str(current_month) not in cache_state['eggs_collected']['state']['month_trays_and_exact']:
             if current_month < 0:
-                log.error(f"No last month laying data found from {temp}")
+                logging_wrapper_error(f"No last month laying data found from {temp}")
                 return None, None, None, None, None
             current_month -= month_in_seconds
 
         current_month = str(current_month)
     else:
-        log.error("Current month does not exist in eggs_collected")
+        logging_wrapper_error("Current month does not exist in eggs_collected")
         return None, None, None, None, None
     
     amount_eggs_week = cache_state['eggs_collected']['state']['week_trays_and_exact'][current_week]['trays_collected']
@@ -1764,13 +1712,13 @@ def calculate_main_state(stack=None, memory=None, pc=None, analysed=None):
     try:
         week_laying_percent = week_laying_percent.quantize(TWOPLACES)
     except InvalidOperation:
-        log.error(f"Invalid Decimal Operation on weekly egg percent, value: {week_laying_percent}")
+        logging_wrapper_error(f"Invalid Decimal Operation on weekly egg percent, value: {week_laying_percent}")
         return None, None, None, None, None
 
     try:
         month_laying_percent = month_laying_percent.quantize(TWOPLACES)
     except InvalidOperation:
-        log.error(f"Invalid Decimal Operation on monthly egg percent, value: {month_laying_percent}")
+        logging_wrapper_error(f"Invalid Decimal Operation on monthly egg percent, value: {month_laying_percent}")
         return None, None, None, None, None
 
     all_trays_sold = [Decimal(v['tray_no']) for k, v in cache_state['sales'].items() if k != 'state' and k != 'prev_states']
@@ -1795,7 +1743,7 @@ def calculate_main_state(stack=None, memory=None, pc=None, analysed=None):
 
 
 def balance(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: BALANCE")
+    logging_wrapper_debug(f"{pc}: BALANCE")
     pc += 1
 
     name = stack.pop()
@@ -1806,7 +1754,7 @@ def balance(stack=None, memory=None, pc=None, analysed=None):
 
 # takes unix epoch and checks if enough trays existed for the sale to be valid
 def is_sale_trays_safe(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: TRAYSAVAIL")
+    logging_wrapper_debug(f"{pc}: TRAYSAVAIL")
     pc += 1
 
     tray_no = stack.pop()
@@ -1827,7 +1775,7 @@ def is_sale_trays_safe(stack=None, memory=None, pc=None, analysed=None):
 
 # get all dead txs with time less than or == given push laying percent
 def laying_percent(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: LAYINGPERCENT")
+    logging_wrapper_debug(f"{pc}: LAYINGPERCENT")
     pc += 1
 
     unix_epoch = stack.pop()
@@ -1842,7 +1790,7 @@ def laying_percent(stack=None, memory=None, pc=None, analysed=None):
 
     if period == "WEEK":
         if str(unix_epoch) not in cache_state['eggs_collected']['state']['week_trays_and_exact']:
-            log.error(f"Given week does not exist in eggs_collected {unix_epoch}")
+            logging_wrapper_error(f"Given week does not exist in eggs_collected {unix_epoch}")
             return None, None, None, None, None
         
         total_eggs = cache_state['eggs_collected']['state']['week_trays_and_exact'][str(unix_epoch)]['trays_collected']
@@ -1852,12 +1800,12 @@ def laying_percent(stack=None, memory=None, pc=None, analysed=None):
         try:
             percent = percent.quantize(TWOPLACES)
         except InvalidOperation:
-            log.error(f"Invalid Decimal Operation on weekly egg percent, value: {percent}")
+            logging_wrapper_error(f"Invalid Decimal Operation on weekly egg percent, value: {percent}")
             return None, None, None, None, None
 
     elif period == "MONTH":
         if str(unix_epoch) not in cache_state['eggs_collected']['state']['month_trays_and_exact']:
-            log.error(f"Given month does not exist in eggs_collected {unix_epoch}")
+            logging_wrapper_error(f"Given month does not exist in eggs_collected {unix_epoch}")
             return None, None, None, None, None
         
         total_eggs = cache_state['eggs_collected']['state']['month_trays_and_exact'][str(unix_epoch)]['trays_collected']
@@ -1867,7 +1815,7 @@ def laying_percent(stack=None, memory=None, pc=None, analysed=None):
         try:
             percent = percent.quantize(TWOPLACES)
         except InvalidOperation:
-            log.error(f"Invalid Decimal Operation on monthly egg percent, value: {percent}")
+            logging_wrapper_error(f"Invalid Decimal Operation on monthly egg percent, value: {percent}")
             return None, None, None, None, None
   
     
@@ -1878,7 +1826,7 @@ def laying_percent(stack=None, memory=None, pc=None, analysed=None):
 
 # only called after update cache
 def update_ui_entries(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: UIENTRIES")
+    logging_wrapper_debug(f"{pc}: UIENTRIES")
     pc += 1
 
     for col_name in EVENTC.values():
@@ -1895,7 +1843,7 @@ def update_ui_entries(stack=None, memory=None, pc=None, analysed=None):
             case 'eggs_collected':
                 type = 'Eggs Collected'
             case _:
-                log.error(f"No match case found for {col_name}")
+                logging_wrapper_error(f"No match case found for {col_name}")
                 return None, None, None, None, None
 
         for hash in cache_state[col_name]:
@@ -1909,14 +1857,14 @@ def update_ui_entries(stack=None, memory=None, pc=None, analysed=None):
                 'type': type,
                 'data': cache_state[col_name][hash]
             }
-    log.info(f"UI transactions updated")
+    logging_wrapper_info(f"UI transactions updated")
 
     return stack, memory, pc, cache_state, cache_accounts
 
 
 # only called after update cache
 def update_verification_data(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: VERIFYCOL")
+    logging_wrapper_debug(f"{pc}: VERIFYCOL")
     pc += 1
 
     valid_hashes = []
@@ -1932,14 +1880,14 @@ def update_verification_data(stack=None, memory=None, pc=None, analysed=None):
 
     cache_verification_data['hashes'] = valid_hashes
         
-    log.info(f"Verification data updated")
+    logging_wrapper_info(f"Verification data updated")
 
     return stack, memory, pc, cache_state, cache_accounts
 
 
 # only called after update cache
 def update_dashboard_data(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: DASHBOARD")
+    logging_wrapper_debug(f"{pc}: DASHBOARD")
     pc += 1
 
     # get last 2 weeks and month profit
@@ -2033,7 +1981,7 @@ def update_dashboard_data(stack=None, memory=None, pc=None, analysed=None):
         'month_profit_chart': to_area_chart_dict(x_axis=x_axis_month_profit, y_axis=y_axis_month_profit, label='Profit per Month')
     }
 
-    log.info(f"Dashboard data updated")
+    logging_wrapper_info(f"Dashboard data updated")
 
     return stack, memory, pc, cache_state, cache_accounts
 
@@ -2045,24 +1993,24 @@ def update_dashboard_data(stack=None, memory=None, pc=None, analysed=None):
 # if local contains new tx hash, check if remote deleted contains same tx hash, if so rerun code,
 # else write (world_state, given collection state & entry itself)
 def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=None):
-    log.debug(f"{pc}: WRITE")
+    logging_wrapper_debug(f"{pc}: WRITE")
     pc += 1
 
     # hashes check should be first as the other checks depend on its return value
     if not sanity_check_hashes_match(cache_state=cache_state, db=db):
-        log.error("Sanity check failed, some hashes might be missing")
+        logging_wrapper_error("Sanity check failed, some hashes might be missing")
         return None, None, None, None, None
     elif not sanity_check_trays_to_sales(cache_state=cache_state):
-        log.error("Sanity check failed, a sale is invalid, due to trays used")
+        logging_wrapper_error("Sanity check failed, a sale is invalid, due to trays used")
         return None, None, None, None, None
     elif not sanity_check_all_txs_included(cache_state=cache_state, cache_ui_txs=cache_ui_txs, db=db):
-        log.error("Sanity check failed, missing txs in tx_ui or extras available")
+        logging_wrapper_error("Sanity check failed, missing txs in tx_ui or extras available")
         return None, None, None, None, None
     elif not sanity_check_ps_to_trade(cache_state=cache_state):
-        log.error("Sanity check failed, a sale or purchase does not have a matching trade")
+        logging_wrapper_error("Sanity check failed, a sale or purchase does not have a matching trade")
         return None, None, None, None, None
     else:
-        log.info("sanity check passed, proceeding with push...")
+        logging_wrapper_info("sanity check passed, proceeding with push...")
 
     map_nested_dicts_modify(cache_state, lambda v: float(v) if isinstance(v, Decimal) else v)
     map_nested_dicts_modify(cache_deleted, lambda v: float(v) if isinstance(v, Decimal) else v)
@@ -2070,7 +2018,7 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
     map_nested_dicts_modify(cache_ui_txs, lambda v: float(v) if isinstance(v, Decimal) else v)
     map_nested_dicts_modify(cache_verification_data, lambda v: float(v) if isinstance(v, Decimal) else v)
     map_nested_dicts_modify(cache_dashboard_data, lambda v: float(v) if isinstance(v, Decimal) else v)
-    log.info("dicts sanitized")
+    logging_wrapper_info("dicts sanitized")
 
     ws_col_ref = db.collection('world_state')
     world_state_ref = ws_col_ref.document('main')
@@ -2093,17 +2041,17 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
         proc_id = mutex_snap.get('process_name')
 
         if is_lock_held == 1 and str(memory['PROCID']) != proc_id:
-            log.warning(f"Lock is held by process {proc_id}, hence, write will not happen")
+            logging_wrapper_warn(f"Lock is held by process {proc_id}, hence, write will not happen")
             return 0
         elif is_lock_held == 1 and str(memory['PROCID']) == proc_id:
-            log.info("Lock still held, proceeding...")
+            logging_wrapper_info("Lock still held, proceeding...")
             return 1
         elif is_lock_held == 0:
             transaction.update(mutex_lock_ref, {'is_lock_held': 1, 'process_name': str(memory['PROCID'])})
-            log.info("Acquired lock! proceeding...")
+            logging_wrapper_info("Acquired lock! proceeding...")
             return 1
         else:
-            log.error("Lock document not found")
+            logging_wrapper_error("Lock document not found")
             return 0
     
     is_lock_acquired = get_lock(transaction, mutex_lock_ref)
@@ -2123,17 +2071,17 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
             local_col_roots.add(cache_state[k]['state']['root_hash'])
     
     if remote_root == cache_state['world_state']['main']['root']:
-        log.info("Remote and local main root hash match, no changes were made")
+        logging_wrapper_info("Remote and local main root hash match, no changes were made")
 
         db.collection('mutex_lock').document('lock').set({'is_lock_held': 0, 'process_name': ''})
-        log.info("Lock released!")
+        logging_wrapper_info("Lock released!")
         return stack, memory, pc, cache_state, cache_accounts
     
     if remote_col_roots == local_col_roots:
-        log.error(f"Remote and local collection root hashes match when main root don't, {local_col_roots}")
+        logging_wrapper_error(f"Remote and local collection root hashes match when main root don't, {local_col_roots}")
 
         db.collection('mutex_lock').document('lock').set({'is_lock_held': 0, 'process_name': ''})
-        log.info("Lock released!")
+        logging_wrapper_info("Lock released!")
         return None, None, None, None, None
 
     altered_collections = local_col_roots - remote_col_roots
@@ -2153,25 +2101,25 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
                 in_remote_entry_hash = set(v_.keys()) - v['entry']
 
                 if len(in_remote_true_hash) != 0 or len(in_remote_entry_hash) != 0:
-                    log.info("Change happened in remote, rerun signal sent...")
+                    logging_wrapper_info("Change happened in remote, rerun signal sent...")
 
                     db.collection('mutex_lock').document('lock').set({'is_lock_held': 0, 'process_name': ''})
-                    log.info("Lock released!")
+                    logging_wrapper_info("Lock released!")
                     return stack, memory, -2, cache_state, cache_accounts
 
     for x in col_names:
         col_ref = db.collection(x)
         i = 0
-        log.info(f"committing {x} docs...")
+        logging_wrapper_info(f"committing {x} docs...")
         bar = FillingCirclesBar(f'Committing {x}', max=len(cache_state[x].keys()) if len(cache_state[x].keys()) != 0 else 1)
         for id in cache_state[x]:
             is_skip = False
             if id in remote_ws_dict['all_hashes'][x]:
-                log.debug(f"found matching id in {x}: {id}")
-                log.debug(f"true hash local: {cache_state[x][id]['true_hash']}, remote: {remote_ws_dict['all_hashes'][x][id]}")
+                logging_wrapper_debug(f"found matching id in {x}: {id}")
+                logging_wrapper_debug(f"true hash local: {cache_state[x][id]['true_hash']}, remote: {remote_ws_dict['all_hashes'][x][id]}")
                 if cache_state[x][id]['true_hash'] == remote_ws_dict['all_hashes'][x][id]:
                     # silently skip already written data
-                    log.debug(f"skipped {x}: {id}")
+                    logging_wrapper_debug(f"skipped {x}: {id}")
                     is_skip = True
             
             if is_skip:
@@ -2180,7 +2128,7 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
             batch.set(doc_ref, cache_state[x][id])
             batch.commit()
             i += 1
-            log.info(f"committed {x} entry {i} of {len(cache_state[x].keys())}: {id}")
+            logging_wrapper_info(f"committed {x} entry {i} of {len(cache_state[x].keys())}: {id}")
             bar.next()
         
         if i == 0:
@@ -2193,7 +2141,7 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
         bar.next()
         bar.finish()
 
-    log.info(f"all collections committed, committing extra data")
+    logging_wrapper_info(f"all collections committed, committing extra data")
 
     bar = FillingCirclesBar(f'Committing deleted', max=len(cache_deleted.keys()) if len(cache_deleted.keys()) != 0 else 1)
     for id in cache_deleted:
@@ -2201,16 +2149,16 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
         batch.set(doc_ref, cache_deleted[id])
         bar.next()
     bar.next()
-    log.info("deleted docs committed")
+    logging_wrapper_info("deleted docs committed")
     bar.finish()
     
     doc_ref = acc_col_ref.document('accounts')
     batch.set(doc_ref, cache_accounts)
 
-    log.info("accounts committed")
+    logging_wrapper_info("accounts committed")
 
     i = 0
-    log.info(f"committing UI txs docs...")
+    logging_wrapper_info(f"committing UI txs docs...")
     bar = FillingCirclesBar(f'Committing UI txs', max=len(cache_ui_txs.keys()) if len(cache_ui_txs.keys()) != 0 else 1)
     for id in cache_ui_txs:
         continue_outer = False
@@ -2218,7 +2166,7 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
             if id in remote_ws_dict['all_hashes'][x]:
                 if remote_ws_dict['all_hashes'][x][id] == cache_ui_txs[id]['data']['true_hash']:
                     # silently skip already written data
-                    log.debug(f"skipped UI tx {x}: {id} of true hash {cache_ui_txs[id]['data']['true_hash']}")
+                    logging_wrapper_debug(f"skipped UI tx {x}: {id} of true hash {cache_ui_txs[id]['data']['true_hash']}")
                     continue_outer = True
                 
                 # break from inner loop since the id cannot exist in a different collection
@@ -2231,7 +2179,7 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
         batch.set(doc_ref, cache_ui_txs[id])
         batch.commit()
         i += 1
-        log.info(f"committed entry {i} of {len(cache_ui_txs.keys())}: {id}")
+        logging_wrapper_info(f"committed entry {i} of {len(cache_ui_txs.keys())}: {id}")
         bar.next()
     
     if i == 0:
@@ -2243,26 +2191,26 @@ def compare_with_remote_and_write(stack=None, memory=None, pc=None, analysed=Non
     bar.next()
     bar.finish()
 
-    log.info("UI transactions committed")
+    logging_wrapper_info("UI transactions committed")
     
     doc_ref = ver_data_col_ref.document('verification')
     batch.set(doc_ref, cache_verification_data)
 
-    log.info("Verification data committed")
+    logging_wrapper_info("Verification data committed")
 
     doc_ref = dash_col_ref.document('dashboard')
     batch.set(doc_ref, cache_dashboard_data)
 
-    log.info("dashboard data written")
+    logging_wrapper_info("dashboard data written")
     
     batch.set(world_state_ref, cache_state['world_state']['main'])
     batch.commit()
-    log.info("world state committed")
+    logging_wrapper_info("world state committed")
 
-    log.info("Data written successfully")
+    logging_wrapper_info("Data written successfully")
 
     db.collection('mutex_lock').document('lock').set({'is_lock_held': 0, 'process_name': ''})
-    log.info("Lock released!")
+    logging_wrapper_info("Lock released!")
 
     return stack, memory, pc, cache_state, cache_accounts
 

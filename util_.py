@@ -11,6 +11,25 @@ import collections.abc
 getcontext().traps[FloatOperation] = True
 TWOPLACES = Decimal(10) ** -2
 
+def logging_wrapper_debug(message):
+    message = message[:MAX_CHAR_COUNT_LOG]+"..." if len(message) > MAX_CHAR_COUNT_LOG else message
+    log.debug(message)
+
+
+def logging_wrapper_error(message):
+    message = message[:MAX_CHAR_COUNT_LOG]+"..." if len(message) > MAX_CHAR_COUNT_LOG else message
+    log.error(message)
+
+
+def logging_wrapper_info(message):
+    message = message[:MAX_CHAR_COUNT_LOG]+"..." if len(message) > MAX_CHAR_COUNT_LOG else message
+    log.info(message)
+
+
+def logging_wrapper_warn(message):
+    message = message[:MAX_CHAR_COUNT_LOG]+"..." if len(message) > MAX_CHAR_COUNT_LOG else message
+    log.warning(message)
+
 
 def dup_exists(l):
     seen = set()
@@ -65,7 +84,7 @@ def get_eggs_diff(val1, val2):
         eggs_left = Decimal(f'{eggs_left}')
         return f'{res_trays},{round(eggs_left)}', res
     
-    log.error(f"Failed to subtract eggs, got unknown types, {type(val1)}, {type(val2)}")
+    logging_wrapper_error(f"Failed to subtract eggs, got unknown types, {type(val1)}, {type(val2)}")
     return None, None
 
 
@@ -82,7 +101,7 @@ def get_eggs(amount):
         res = Decimal(res[0])*eggs_in_tray+Decimal(res[1])
         return amount, res
     
-    log.error(f"Failed to convert eggs, got unknown type, {type(amount)}")
+    logging_wrapper_error(f"Failed to convert eggs, got unknown type, {type(amount)}")
     return None, None
 
 
@@ -127,7 +146,7 @@ def increment_eggs(val1, val2):
         eggs_left = Decimal(f'{eggs_left}')
         return f'{res_trays},{round(eggs_left)}', res
     
-    log.error(f"Failed to increment eggs, got unknown types, {type(val1)}, {type(val2)}")
+    logging_wrapper_error(f"Failed to increment eggs, got unknown types, {type(val1)}, {type(val2)}")
     return None, None
 
 
@@ -172,7 +191,7 @@ def reduce_add_eggs(val1, val2):
         eggs_left = Decimal(f'{eggs_left}')
         return f'{res_trays},{round(eggs_left)}'
     
-    log.error(f"Failed to increment eggs, got unknown types, {type(val1)}, {type(val2)}")
+    logging_wrapper_error(f"Failed to increment eggs, got unknown types, {type(val1)}, {type(val2)}")
     return None
 
 
@@ -210,43 +229,13 @@ def sanity_check_hashes_match(cache_state, db):
         dups = dup_exists(list(cache_state[k]['state']['all_tx_hashes'].keys()))
         dups_true = dup_exists(list([v['true_hash'] for _, v in cache_state[k]['state']['all_tx_hashes'].items()]))
         if dups or dups_true:
-            print(k)
-            for l in set(dups_true):
-                id = [b for b, n in cache_state[k]['state']['all_tx_hashes'].items() if n['true_hash'] == l]
-                doc = db.collection(k).document(id[0]).get()
-                doc2 = db.collection(k).document(id[1]).get()
-                def internal_hash(to_hash):
-                    m = hashlib.sha256()
-                    m.update(to_hash.encode())
-                    return m.hexdigest()
-                def get_hash():
-                    if k == 'trades':
-                        return internal_hash(str(int(doc2.to_dict()['date']['unix']))+doc.to_dict()['from']+doc.to_dict()['to']+doc.to_dict()['purchase_hash']+doc.to_dict()['sale_hash']+str(int(doc.to_dict()['amount']))), internal_hash(str(float(doc2.to_dict()['date']['unix']))+doc.to_dict()['from']+doc.to_dict()['to']+doc.to_dict()['purchase_hash']+doc.to_dict()['sale_hash']+str(float(doc.to_dict()['amount'])))
-                print(id)
-                if get_hash()[0] in id:
-                    print("removing", get_hash()[0])
-                elif get_hash()[1] in id:
-                    print("removing", get_hash()[1])
-
-                '''
-                db.collection(k).document(internal_hash(str(doc.to_dict()['date']['unix']))).delete()
-                del cache_state[k]['state']['all_tx_hashes'][internal_hash(str(doc.to_dict()['date']['unix']))]
-                del cache_state['world_state']['main']['all_hashes'][k][internal_hash(str(doc.to_dict()['date']['unix']))]
-                db.collection(k).document('state').update({
-                    'all_tx_hashes': cache_state[k]['state']['all_tx_hashes']
-                })
-                db.collection('world_state').document('main').update({
-                    f'all_hashes.{k}': cache_state['world_state']['main']['all_hashes'][k]
-                })
-                '''
-
-            log.error(f"Duplicate entries in state {k}: entry hash: {dups}, true hash: {dups_true}")
+            logging_wrapper_error(f"Duplicate entries in state {k}: entry hash: {dups}, true hash: {dups_true}")
             return False
         
         dups = dup_exists(list(cache_state['world_state']['main']['all_hashes'][k].keys()))
         dups_true = dup_exists(list(cache_state['world_state']['main']['all_hashes'][k].values()))
         if dups or dups_true:
-            log.error(f"Duplicate entries in world state: entry hash: {dups}, true hash: {dups_true}")
+            logging_wrapper_error(f"Duplicate entries in world state: entry hash: {dups}, true hash: {dups_true}")
             return False
         
         id_state_set = set(cache_state[k]['state']['all_tx_hashes'].keys())
@@ -255,6 +244,13 @@ def sanity_check_hashes_match(cache_state, db):
         id_col_set = set(cache_state[k].keys())
         id_col_set.remove('state')
         id_col_set.remove('prev_states')
+        id_col_set_field = set([y['tx_hash'] for x, y in cache_state[k].items() if x != 'state' and x != 'prev_states']) # confirm that doc id and tx_hash field match
+        extra_tx_hash = id_col_set_field - id_col_set
+        extra_doc_hash = id_col_set - id_col_set_field
+        if extra_doc_hash or extra_tx_hash:
+            logging_wrapper_warn(f"Found a tx_hash that doesn't match a doc id in {k}, {extra_tx_hash}")
+            logging_wrapper_warn(f"Vice Versa, {extra_doc_hash}")
+            return False
 
         id_col_true_set = set()
         id_col_true_list = []
@@ -267,7 +263,7 @@ def sanity_check_hashes_match(cache_state, db):
         dups = dup_exists(list(cache_state[k].keys()))
         dups_true = dup_exists(id_col_true_list)
         if dups or dups_true:
-            log.error(f"Duplicate entries in collection: entry hash: {dups}, true hash: {dups_true}")
+            logging_wrapper_error(f"Duplicate entries in collection: entry hash: {dups}, true hash: {dups_true}")
             return False
 
         id_world_set = set(cache_state['world_state']['main']['all_hashes'][k].keys())
@@ -293,7 +289,7 @@ def sanity_check_all_txs_included(cache_state, cache_ui_txs, db):
     tx_ui_hashes = tx_ui_hashes + [v['data']['true_hash'] for _,v in cache_ui_txs.items()]
     dups = dup_exists(tx_ui_hashes)
     if dups:
-        log.error(f"Duplicate entries in tx_ui: entry/true hash: {dups}")
+        logging_wrapper_error(f"Duplicate entries in tx_ui: entry/true hash: {dups}")
         return False
 
     return set(tx_ui_hashes) == set(all_hashes)
@@ -323,7 +319,7 @@ def get_true_hash_for_tx(tx, collection_name):
         tx_data_to_hash += tx['section'] + str(tx['submitted_on']['unix']) + tx['buyer'] + str(tx['tray_price']) + str(tx['tray_no']) + tx['by'] + str(tx['date']['unix'])
         
         if tx['prev_values']:
-            log.debug(f"found prev values dict of size {len(tx['prev_values'].keys())}")
+            logging_wrapper_debug(f"found prev values dict of size {len(tx['prev_values'].keys())}")
             for k in range(len(tx['prev_values'].keys())):
                 prev = tx['prev_values'][str(k)]
                 tx_data_to_hash += prev['section'] + str(prev['submitted_on']['unix']) + prev['buyer'] + str(prev['tray_price']) + str(prev['tray_no']) + prev['by'] + str(prev['date']['unix'])
@@ -332,7 +328,7 @@ def get_true_hash_for_tx(tx, collection_name):
         tx_data_to_hash += tx['section'] + str(tx['submitted_on']['unix']) + tx['item_name'] + str(tx['item_price']) + str(tx['item_no']) + tx['by'] + str(tx['date']['unix'])
         
         if tx['prev_values']:
-            log.debug(f"found prev values dict of size {len(tx['prev_values'].keys())}")
+            logging_wrapper_debug(f"found prev values dict of size {len(tx['prev_values'].keys())}")
             for k in range(len(tx['prev_values'].keys())):
                 prev = tx['prev_values'][str(k)]
                 tx_data_to_hash += prev['section'] + str(prev['submitted_on']['unix']) + prev['item_name'] + str(prev['item_price']) + str(prev['item_no']) + prev['by'] + str(prev['date']['unix'])
@@ -341,7 +337,7 @@ def get_true_hash_for_tx(tx, collection_name):
         tx_data_to_hash += str(tx['amount']) + tx['sale_hash'] + tx['purchase_hash'] + str(tx['submitted_on']['unix']) + tx['from'] + tx['to'] + str(tx['reason']) + tx['by'] + str(tx['date']['unix'])
         
         if tx['prev_values']:
-            log.debug(f"found prev values dict of size {len(tx['prev_values'].keys())}")
+            logging_wrapper_debug(f"found prev values dict of size {len(tx['prev_values'].keys())}")
             for k in range(len(tx['prev_values'].keys())):
                 prev = tx['prev_values'][str(k)]
                 tx_data_to_hash += str(prev['amount']) + prev['sale_hash'] + prev['purchase_hash'] + str(prev['submitted_on']['unix']) + prev['from'] + prev['to'] + str(prev['reason']) + prev['by'] + str(prev['date']['unix'])
@@ -350,7 +346,7 @@ def get_true_hash_for_tx(tx, collection_name):
         tx_data_to_hash += str(tx['a1']) + str(tx['a2']) + str(tx['b1']) + str(tx['b2']) + str(tx['c1']) + str(tx['c2']) + str(tx['submitted_on']['unix']) + str(tx['broken']) + str(tx['house']) + tx['trays_collected'] + tx['by'] + str(tx['date']['unix'])
         
         if tx['prev_values']:
-            log.debug(f"found prev values dict of size {len(tx['prev_values'].keys())}")
+            logging_wrapper_debug(f"found prev values dict of size {len(tx['prev_values'].keys())}")
             for k in range(len(tx['prev_values'].keys())):
                 prev = tx['prev_values'][str(k)]
                 tx_data_to_hash += str(prev['a1']) + str(prev['a2']) + str(prev['b1']) + str(prev['b2']) + str(prev['c1']) + str(prev['c2']) + str(prev['submitted_on']['unix']) + str(prev['broken']) + str(prev['house']) + prev['trays_collected'] + prev['by'] + str(prev['date']['unix'])
@@ -359,18 +355,16 @@ def get_true_hash_for_tx(tx, collection_name):
         tx_data_to_hash += tx['image_id'] + tx['image_url'] + tx['section'] + str(tx['submitted_on']['unix']) + tx['location'] + str(tx['number']) + tx['reason'] + tx['by'] + str(tx['date']['unix'])
         
         if tx['prev_values']:
-            log.debug(f"found prev values dict of size {len(tx['prev_values'].keys())}")
+            logging_wrapper_debug(f"found prev values dict of size {len(tx['prev_values'].keys())}")
             for k in range(len(tx['prev_values'].keys())):
                 prev = tx['prev_values'][str(k)]
                 tx_data_to_hash += prev['image_id'] + prev['image_url'] + prev['section'] + str(prev['submitted_on']['unix']) + prev['location'] + str(prev['number']) + prev['reason'] + prev['by'] + str(prev['date']['unix'])
 
     else:
-        log.error("Invalid collection name provided to true hash function")
+        logging_wrapper_error("Invalid collection name provided to true hash function")
         return None
     
-    message = f"tx data to hash, {tx_data_to_hash}"
-    message = message[:MAX_CHAR_COUNT_LOG]+"..."  if len(message) > MAX_CHAR_COUNT_LOG else message
-    log.debug(message)
+    logging_wrapper_debug(f"tx data to hash, {tx_data_to_hash}")
 
     def internal_hash(to_hash):
         m = hashlib.sha256()
@@ -424,7 +418,7 @@ def laying_percent_for_a_day(unix_epoch, dead_docs, eggs):
     try:
         percent = percent.quantize(TWOPLACES)
     except InvalidOperation:
-        log.error(f"Invalid Decimal Operation on daily laying percent, value: {percent}")
+        logging_wrapper_error(f"Invalid Decimal Operation on daily laying percent, value: {percent}")
         return None
 
     return percent
