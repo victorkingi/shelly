@@ -2838,7 +2838,7 @@ def test():
                 doc_val['values']['section'] = 'PPURITY'
             elif doc_val['values']['section'] == 'OTHER_BUY':
                 doc_val['values']['section'] = 'POTHER'
-            elif doc_val['values']['itemName'] == 'LAYERS ':
+            elif doc_val['values']['itemName'] == 'LAYERS ' or doc_val['values']['itemName'] == 'Layers ':
                 doc_val['values']['itemName'] = 'LAYERS'
 
             if first:
@@ -2914,8 +2914,8 @@ def test():
         elif doc_val['values']['category'].lower() == 'deadsick':
             if first:
                 temp_code = ops.create_ds_instructions(values={
-                    'image_url': doc_val['values']['url'],
-                    'image_id': doc_val['values']['photo'],
+                    'image_url': doc_val['url'],
+                    'image_id': doc_val['file_name'],
                     'reason': doc_val['values']['reason'],
                     'number': doc_val['values']['chickenNo'],
                     'by': doc_val['values']['submittedBy'],
@@ -2949,7 +2949,7 @@ def test():
                     raise RuntimeError("Invalid number of jumpif and jumpdest")
             else:
                 temp_code = ops.create_ds_instructions(values={
-                    'image_url': doc_val['values']['url'],
+                    'image_url': doc_val['url'],
                     'image_id': doc_val['file_name'],
                     'reason': doc_val['values']['reason'],
                     'number': doc_val['values']['chickenNo'],
@@ -2957,7 +2957,7 @@ def test():
                     'date': doc_val['values']['date'].timestamp(),
                     'section': doc_val['values']['section'],
                     'location': doc_val['values']['place'],
-                    'submitted_on': doc_val['submittedOn'].timestamp()
+                    'submitted_on': doc_val['values']['submittedOn'].timestamp()
                 })
                 temp_code = list(temp_code[18:])
                 if not last_instr:
@@ -3082,6 +3082,7 @@ def test():
     return code
 
 #test()
+
 
 def delete_collection(coll_ref, batch_size=2000):
     docs = coll_ref.limit(batch_size).stream()

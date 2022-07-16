@@ -9,6 +9,8 @@ eggs_in_tray = Decimal(30)
 starting_birds_no = Decimal(500)
 
 CREDENTIALS = "poultry101-6b1ed-firebase-adminsdk-4h0rk-4b8268dd31.json"
+# poultry101-6b1ed-firebase-adminsdk-4h0rk-4b8268dd31.json
+# core101-3afde-firebase-adminsdk-sxm20-194a475b51.json
 
 # DIGITS
 
