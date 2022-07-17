@@ -1855,9 +1855,10 @@ def update_ui_entries(stack=None, memory=None, pc=None, analysed=None):
                 'status': Decimal(1),
                 'submitted_on': cache_state[col_name][hash]['submitted_on']['unix'],
                 'type': type,
+                'by': cache_state[col_name][hash]['by'],
                 'data': cache_state[col_name][hash]
             }
-           
+
     logging_wrapper_info(f"UI transactions updated")
 
     return stack, memory, pc, cache_state, cache_accounts
